@@ -2,8 +2,9 @@ import ast
 import re
 
 
-FORBIDDEN_IMPORTS = {"os", "subprocess", "sys", "shutil", "socket", "builtins"}
-FORBIDDEN_BUILTINS = {"open", "exec", "eval", "__import__"}
+FORBIDDEN_IMPORTS = {"os", "subprocess", "sys", "shutil", "socket", "builtins", "importlib"}
+FORBIDDEN_BUILTINS = {"open", "eval", "compile"}
+# Note: __import__ is allowed but sandboxed — only numpy/pandas/math permitted at runtime
 
 
 def syntax_check(src: str) -> list[str]:

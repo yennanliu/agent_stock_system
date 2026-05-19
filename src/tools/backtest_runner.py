@@ -11,17 +11,41 @@ from src.config import DEFAULT_CAPITAL
 
 # ── Safe execution scope ──────────────────────────────────────────────────────
 
-_SAFE_SCOPE: dict[str, Any] = {
-    "__builtins__": {"__build_class__": __build_class__, "__name__": __name__},
-    "Strategy": Strategy,
-    "crossover": crossover,
-    "np": np,
-    "pd": pd,
-}
+_ALLOWED_IMPORTS = {"numpy", "pandas", "math", "statistics", "backtesting", "backtesting.lib"}
+
+
+def _safe_import(name, *args, **kwargs):
+    root = name.split(".")[0]
+    if root not in _ALLOWED_IMPORTS and name not in _ALLOWED_IMPORTS:
+        raise ImportError(f"Import of '{name}' is not allowed in strategy code.")
+    return __import__(name, *args, **kwargs)
+
+
+def _make_scope() -> dict[str, Any]:
+    return {
+        "__builtins__": {
+            "__build_class__": __build_class__,
+            "__name__": __name__,
+            "__import__": _safe_import,
+            # standard safe builtins strategies may need
+            "abs": abs, "round": round, "min": min, "max": max,
+            "len": len, "range": range, "enumerate": enumerate,
+            "zip": zip, "map": map, "filter": filter,
+            "list": list, "dict": dict, "tuple": tuple, "set": set,
+            "int": int, "float": float, "str": str, "bool": bool,
+            "isinstance": isinstance, "hasattr": hasattr,
+            "print": print,  # useful for debugging generated code
+            "True": True, "False": False, "None": None,
+        },
+        "Strategy": Strategy,
+        "crossover": crossover,
+        "np": np,
+        "pd": pd,
+    }
 
 
 def _load_strategy_class(source_code: str) -> type:
-    scope = dict(_SAFE_SCOPE)
+    scope = _make_scope()
     try:
         exec(compile(source_code, "<strategy>", "exec"), scope)
     except Exception as e:
