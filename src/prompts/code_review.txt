@@ -24,12 +24,14 @@ TA HELPER FUNCTIONS (already in scope — call directly via self.I):
 - `HIGHEST(values, n)`, `LOWEST(values, n)`
 
 COMMON FIX PATTERNS:
-- `'XYZStrategy' object has no attribute 'SMA'`  → the LLM wrote `self.SMA(...)`. Replace with the module-level helper: `self.sma = self.I(SMA, close, n)`.
-- `name 'SMA' is not defined`                    → same fix: use `self.I(SMA, close, n)`.
-- `import ta` / `ta.trend.sma_indicator(...)`    → replace with `self.I(SMA, close, n)`.
-- `import pandas_ta` / `ta.momentum.rsi(...)`    → replace with `self.I(RSI, close, 14)`.
-- Missing `self.I()` wrapper on an indicator     → wrap it: `self.x = self.I(FUNC, args)`.
-- Positive index `self.data.Close[1]`            → change to negative: `self.data.Close[-1]`.
+- `'XYZStrategy' object has no attribute 'SMA'`        → the LLM wrote `self.SMA(...)`. Replace with the module-level helper: `self.sma = self.I(SMA, close, n)`.
+- `name 'SMA' is not defined`                          → same fix: use `self.I(SMA, close, n)`.
+- `import ta` / `ta.trend.sma_indicator(...)`          → replace with `self.I(SMA, close, n)`.
+- `import pandas_ta` / `ta.momentum.rsi(...)`          → replace with `self.I(RSI, close, 14)`.
+- `np.convolve(values, ..., mode='valid')`             → returns a shorter array, breaks `self.I()`. Replace with `self.I(SMA, close, n)`.
+- "Indicators must return numpy.arrays of same length" → an indicator function shortened the array. Replace any custom math with the named helper (SMA, EMA, RSI, …) which preserves length.
+- Missing `self.I()` wrapper on an indicator           → wrap it: `self.x = self.I(FUNC, args)`.
+- Positive index `self.data.Close[1]`                  → change to negative: `self.data.Close[-1]`.
 
 BACKTESTING.PY RULES:
 - Indicators MUST be registered via `self.I(callable, *args)` in `init()`.

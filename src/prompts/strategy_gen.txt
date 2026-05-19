@@ -30,10 +30,13 @@ TA HELPER FUNCTIONS (use these directly with self.I — do NOT reimplement them)
 | `STDEV(values, n=20)`                 | Rolling standard deviation       |
 | `HIGHEST(values, n)` / `LOWEST(values, n)` | Rolling max / min          |
 
-FORBIDDEN — these will cause runtime errors:
+FORBIDDEN — these patterns will cause runtime errors:
 - `import ta`, `import talib`, `import pandas_ta`, `import finta`, `import stockstats`
 - Calling `ta.*`, `talib.*`, etc.
 - Defining indicators as instance methods (e.g. `self.SMA(...)`) — call the module-level helpers directly.
+- `np.convolve(values, weights, mode='valid')` for a moving average — this returns a SHORTER array and breaks the `self.I()` length contract. **Use `self.I(SMA, close, n)` instead.**
+- Any function passed to `self.I()` that returns an array shorter than the input. Length MUST be preserved (rolling/ewm-based math is fine; convolve with mode='valid' is not).
+- Using `mode='valid'` anywhere — it truncates output.
 
 CORRECT EXAMPLE:
 ```python

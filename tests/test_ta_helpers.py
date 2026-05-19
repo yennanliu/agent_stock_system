@@ -156,6 +156,13 @@ class HelperStrat(Strategy):
         assert "metrics" in result
         assert result["metrics"]["num_trades"] >= 0
 
+    def test_sma_helper_preserves_data_length(self, close):
+        """The exact bug: backtesting.py requires indicator length == data length."""
+        result = SMA(close, 20)
+        assert len(result) == len(close), (
+            f"SMA broke length contract: input={len(close)}, output={len(result)}"
+        )
+
     def test_strategy_using_bbands_runs(self):
         from src.tools.backtest_runner import run_backtest
         n = 250

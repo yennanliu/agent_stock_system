@@ -138,6 +138,47 @@ class MyStrategy(Strategy):
         issues = api_conformance_check(code)
         assert any("RSI" in i and "instance method" in i for i in issues)
 
+    def test_np_convolve_flagged(self):
+        """np.convolve truncates output → must be flagged."""
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.sma = self.I(lambda x: np.convolve(x, np.ones(20)/20, mode='valid'), self.data.Close)
+    def next(self):
+        if self.data.Close[-1] > self.sma[-1]:
+            self.buy()
+        else:
+            self.sell()
+"""
+        issues = api_conformance_check(code)
+        assert any("convolve" in i for i in issues)
+        # Also flags mode='valid'
+        assert any("valid" in i.lower() for i in issues)
+
+    def test_np_convolve_with_mode_same_still_flagged(self):
+        """Even with mode='same', np.convolve is risky — always flag it."""
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.sma = self.I(lambda x: np.convolve(x, np.ones(20)/20, mode='same'), self.data.Close)
+    def next(self):
+        self.buy()
+"""
+        issues = api_conformance_check(code)
+        assert any("convolve" in i for i in issues)
+
+    def test_mode_valid_keyword_flagged_anywhere(self):
+        """mode='valid' anywhere should be flagged."""
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.x = self.I(lambda x: np.correlate(x, [1,1,1], mode='valid'), self.data.Close)
+    def next(self):
+        self.buy()
+"""
+        issues = api_conformance_check(code)
+        assert any("valid" in i.lower() for i in issues)
+
     def test_module_level_sma_not_flagged(self):
         """Using SMA directly (not self.SMA) must NOT be flagged."""
         code = """

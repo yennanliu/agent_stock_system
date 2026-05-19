@@ -99,6 +99,36 @@ def api_conformance_check(src: str) -> list[str]:
                 f"Use the module-level helper directly: self.I({node.attr}, close, n)."
             )
 
+    # np.convolve() truncates output unless mode='same' is used — and even then
+    # the LLM tends to use mode='valid'. Either way, the right answer is to call
+    # the named SMA() helper which preserves length via rolling().mean().
+    for node in ast.walk(cls):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "np"
+            and node.func.attr == "convolve"
+        ):
+            issues.append(
+                "np.convolve() returns a shorter array than the input and breaks "
+                "self.I() length contract. Use the SMA(values, n) helper instead: "
+                "self.I(SMA, close, n)."
+            )
+
+    # mode='valid' anywhere truncates arrays — usually paired with convolve/correlate
+    for node in ast.walk(cls):
+        if (
+            isinstance(node, ast.keyword)
+            and node.arg == "mode"
+            and isinstance(node.value, ast.Constant)
+            and node.value.value == "valid"
+        ):
+            issues.append(
+                "mode='valid' truncates the output array and breaks indicator length. "
+                "Use the named TA helpers (SMA, EMA, RSI, …) which preserve length."
+            )
+
     return issues
 
 
