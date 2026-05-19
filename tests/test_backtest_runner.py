@@ -99,6 +99,25 @@ class TestMakeScope:
         mod = safe_import("pandas")
         assert mod is pd
 
+    def test_staticmethod_available(self):
+        """staticmethod must be in scope so LLM-generated @staticmethod works."""
+        scope = _make_scope()
+        assert "staticmethod" in scope["__builtins__"]
+
+    def test_classmethod_available(self):
+        scope = _make_scope()
+        assert "classmethod" in scope["__builtins__"]
+
+    def test_super_available(self):
+        scope = _make_scope()
+        assert "super" in scope["__builtins__"]
+
+    def test_dangerous_builtins_blocked(self):
+        scope = _make_scope()
+        builtins = scope["__builtins__"]
+        for blocked in ("open", "eval", "compile", "exec"):
+            assert blocked not in builtins, f"{blocked} should be blocked"
+
 
 # ── _load_strategy_class ───────────────────────────────────────────────────────
 
@@ -124,6 +143,29 @@ class TestLoadStrategyClass:
 
     def test_import_numpy_pandas_inside_strategy_works(self):
         code = "import numpy as np\nimport pandas as pd\n" + SMA_CROSS_STRATEGY
+        from backtesting import Strategy
+        cls = _load_strategy_class(code)
+        assert issubclass(cls, Strategy)
+
+    def test_staticmethod_decorator_works(self):
+        """Strategy code using @staticmethod must not raise NameError."""
+        code = """
+class StaticStrat(Strategy):
+    n = 20
+
+    @staticmethod
+    def _sma(x, n):
+        return pd.Series(x).rolling(n).mean().values
+
+    def init(self):
+        self.ma = self.I(self._sma, self.data.Close, self.n)
+
+    def next(self):
+        if self.data.Close[-1] > self.ma[-1]:
+            self.buy()
+        else:
+            self.sell()
+"""
         from backtesting import Strategy
         cls = _load_strategy_class(code)
         assert issubclass(cls, Strategy)

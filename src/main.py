@@ -4,6 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
@@ -12,6 +13,7 @@ from src.tools.db import (
     init_db,
     get_strategy,
     get_backtest,
+    get_strategy_filepath,
     list_strategies,
     list_runs_for_ticker,
 )
@@ -88,6 +90,57 @@ async def history(ticker: str):
     return list_runs_for_ticker(ticker.upper())
 
 
+@app.get("/api/strategies/{strategy_id}/source")
+async def strategy_source(strategy_id: int):
+    """Return the saved .py file as plain text for download."""
+    path = get_strategy_filepath(strategy_id)
+    if path is None:
+        # Fall back to DB source_code if file was deleted
+        row = get_strategy(strategy_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+        return PlainTextResponse(row["source_code"], media_type="text/x-python")
+    return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="text/x-python")
+
+
+@app.get("/api/strategies/{strategy_id}/download")
+async def strategy_download(strategy_id: int):
+    """Download the saved .py file."""
+    path = get_strategy_filepath(strategy_id)
+    row = get_strategy(strategy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    filename = f"{row['ticker']}_{row['name']}_{strategy_id}.py"
+    if path and path.exists():
+        return FileResponse(str(path), media_type="text/x-python", filename=filename)
+    # Fallback: serve from DB
+    return PlainTextResponse(row["source_code"], media_type="text/x-python",
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/runs")
+async def all_runs():
+    """All backtest runs across all tickers, newest first (for history browser)."""
+    from src.tools.db import _conn
+    import json
+    with _conn() as con:
+        rows = con.execute(
+            """SELECT br.id, br.strategy_id, br.ticker, br.start_date, br.end_date,
+                      br.metrics, br.created_at, s.name as strategy_name
+               FROM backtest_runs br
+               JOIN strategies s ON s.id = br.strategy_id
+               ORDER BY br.created_at DESC, br.id DESC
+               LIMIT 100"""
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get("metrics"):
+            d["metrics"] = json.loads(d["metrics"])
+        result.append(d)
+    return result
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -95,7 +148,6 @@ async def health():
 
 @app.get("/")
 async def root():
-    from fastapi.responses import FileResponse
     return FileResponse("frontend/index.html")
 
 

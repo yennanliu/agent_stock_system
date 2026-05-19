@@ -1,17 +1,20 @@
-import traceback
+import builtins as _builtins
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from backtesting import Backtest, Strategy
-from backtesting.lib import crossover
+from backtesting.lib import crossover, cross, barssince, resample_apply
 
 from src.config import DEFAULT_CAPITAL
+from src.tools.ta_helpers import TA_HELPERS
 
 
 # ── Safe execution scope ──────────────────────────────────────────────────────
 
 _ALLOWED_IMPORTS = {"numpy", "pandas", "math", "statistics", "backtesting", "backtesting.lib"}
+# Builtins that could escape the sandbox or cause damage
+_BLOCKED_BUILTINS = frozenset({"open", "eval", "compile", "exec", "breakpoint", "__loader__", "__spec__"})
 
 
 def _safe_import(name, *args, **kwargs):
@@ -22,26 +25,27 @@ def _safe_import(name, *args, **kwargs):
 
 
 def _make_scope() -> dict[str, Any]:
-    return {
-        "__builtins__": {
-            "__build_class__": __build_class__,
-            "__name__": __name__,
-            "__import__": _safe_import,
-            # standard safe builtins strategies may need
-            "abs": abs, "round": round, "min": min, "max": max,
-            "len": len, "range": range, "enumerate": enumerate,
-            "zip": zip, "map": map, "filter": filter,
-            "list": list, "dict": dict, "tuple": tuple, "set": set,
-            "int": int, "float": float, "str": str, "bool": bool,
-            "isinstance": isinstance, "hasattr": hasattr,
-            "print": print,  # useful for debugging generated code
-            "True": True, "False": False, "None": None,
-        },
+    # Start with ALL Python builtins so staticmethod, classmethod, super,
+    # property, etc. are available, then strip the dangerous ones.
+    safe_builtins = {
+        k: v for k, v in vars(_builtins).items()
+        if k not in _BLOCKED_BUILTINS
+    }
+    safe_builtins["__import__"] = _safe_import
+    scope = {
+        "__builtins__": safe_builtins,
         "Strategy": Strategy,
-        "crossover": crossover,
         "np": np,
         "pd": pd,
+        # backtesting.lib helpers
+        "crossover": crossover,
+        "cross": cross,
+        "barssince": barssince,
+        "resample_apply": resample_apply,
     }
+    # TA helper functions (SMA, EMA, RSI, MACD, BBANDS_*, ATR, …)
+    scope.update(TA_HELPERS)
+    return scope
 
 
 def _load_strategy_class(source_code: str) -> type:

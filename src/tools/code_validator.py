@@ -82,6 +82,23 @@ def api_conformance_check(src: str) -> list[str]:
     if not has_order:
         issues.append("No buy() or sell() calls found in the strategy.")
 
+    # self.TA_HELPER(...) called as instance method (e.g. self.SMA(close, 20))
+    # — these are module-level functions, not strategy methods.
+    TA_NAMES = {"SMA", "EMA", "RSI", "MACD", "MACD_SIGNAL",
+                "BBANDS_UPPER", "BBANDS_MID", "BBANDS_LOWER",
+                "ATR", "STDEV", "HIGHEST", "LOWEST"}
+    for node in ast.walk(cls):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "self"
+            and node.attr in TA_NAMES
+        ):
+            issues.append(
+                f"TA helper '{node.attr}' called as instance method (self.{node.attr}). "
+                f"Use the module-level helper directly: self.I({node.attr}, close, n)."
+            )
+
     return issues
 
 

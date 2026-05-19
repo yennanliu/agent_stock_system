@@ -1,8 +1,13 @@
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 
 from src.config import DB_PATH
+
+STRATEGIES_DIR = Path("strategies")
+STRATEGIES_DIR.mkdir(exist_ok=True)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS strategies (
@@ -58,6 +63,11 @@ def init_db() -> None:
         con.executescript(SCHEMA)
 
 
+def _strategy_filename(strategy_id: int, ticker: str, name: str) -> Path:
+    safe_name = re.sub(r"[^\w]", "_", name)
+    return STRATEGIES_DIR / f"{ticker}_{safe_name}_{strategy_id}.py"
+
+
 def save_strategy(
     ticker: str,
     name: str,
@@ -70,7 +80,34 @@ def save_strategy(
             "INSERT INTO strategies (ticker, name, description, source_code, parameters) VALUES (?,?,?,?,?)",
             (ticker, name, description, source_code, json.dumps(parameters)),
         )
-        return cur.lastrowid
+        sid = cur.lastrowid
+
+    # Write .py file to disk
+    param_lines = "\n".join(f"#   {k} = {v}" for k, v in parameters.items())
+    header = (
+        f'"""\n'
+        f"Strategy: {name}\n"
+        f"Ticker:   {ticker}\n"
+        f"ID:       {sid}\n"
+        f"Parameters:\n{param_lines}\n\n"
+        f"{description}\n"
+        f'"""\n\n'
+        f"import numpy as np\n"
+        f"import pandas as pd\n"
+        f"from backtesting import Strategy\n"
+        f"from backtesting.lib import crossover\n\n"
+    )
+    path = _strategy_filename(sid, ticker, name)
+    path.write_text(header + source_code, encoding="utf-8")
+    return sid
+
+
+def get_strategy_filepath(strategy_id: int) -> Path | None:
+    row = get_strategy(strategy_id)
+    if row is None:
+        return None
+    path = _strategy_filename(strategy_id, row["ticker"], row["name"])
+    return path if path.exists() else None
 
 
 def save_code_review(

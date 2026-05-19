@@ -16,78 +16,91 @@
   </div>
 </header>
 
-<main>
-  <!-- Search -->
-  <section id="search-section">
-    <div class="search-box">
-      <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)" autocomplete="off" />
-      <button id="analyzeBtn">Analyze</button>
+<div class="layout">
+
+  <!-- ── Left sidebar: history browser ── -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span>Run History</span>
+      <button id="refreshHistoryBtn" class="icon-btn" title="Refresh">↻</button>
     </div>
-    <div id="status-log"></div>
-  </section>
-
-  <!-- History sidebar -->
-  <section id="history-section" hidden>
-    <h3>Run History — <span id="historyTicker"></span></h3>
-    <table id="history-table">
-      <thead><tr><th>Date</th><th>Strategy</th><th>Return</th><th>Sharpe</th><th>Max DD</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </section>
-
-  <!-- Strategy panel -->
-  <section id="strategy-panel" hidden>
-    <div class="panel-header">
-      <h2 id="strategyName"></h2>
-      <div id="reviewBadge"></div>
+    <div id="historyList" class="history-list">
+      <div class="history-empty">No runs yet. Analyze a ticker to get started.</div>
     </div>
-    <p id="strategyExplanation"></p>
-    <table id="paramTable" class="param-table"></table>
-    <div class="code-header">
-      <span>Strategy Source Code</span>
-      <button id="runBtn" class="run-btn">▶ Run Again</button>
-    </div>
-    <pre><code id="sourceCode" class="language-python"></code></pre>
-  </section>
+  </aside>
 
-  <!-- Backtest panel -->
-  <section id="backtest-panel" hidden>
-    <h2>Backtest Results</h2>
-    <div id="metricsRow" class="metrics-row"></div>
-
-    <div class="charts-grid">
-      <div class="chart-card full-width">
-        <h4>Equity Curve vs Buy &amp; Hold</h4>
-        <canvas id="equityChart"></canvas>
+  <!-- ── Main content ── -->
+  <main>
+    <!-- Search -->
+    <section id="search-section">
+      <div class="search-box">
+        <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)" autocomplete="off" />
+        <button id="analyzeBtn">Analyze</button>
       </div>
-      <div class="chart-card">
-        <h4>Drawdown</h4>
-        <canvas id="drawdownChart"></canvas>
-      </div>
-      <div class="chart-card">
-        <h4>Trade P&amp;L Distribution</h4>
-        <canvas id="pnlChart"></canvas>
-      </div>
-    </div>
+      <div id="status-log"></div>
+    </section>
 
-    <h3>Trade Log</h3>
-    <div class="table-wrap">
-      <table id="tradeLog">
-        <thead>
-          <tr>
-            <th>#</th><th>Entry</th><th>Exit</th>
-            <th>Entry $</th><th>Exit $</th><th>Size</th>
-            <th>P&amp;L</th><th>Return %</th><th>Days</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <!-- Strategy panel -->
+    <section id="strategy-panel" hidden>
+      <div class="panel-header">
+        <div>
+          <div class="strategy-meta"><span id="strategyTicker" class="ticker-tag"></span> <span id="strategyDate" class="meta-date"></span></div>
+          <h2 id="strategyName"></h2>
+        </div>
+        <div id="reviewBadge"></div>
+      </div>
+      <p id="strategyExplanation"></p>
+      <table id="paramTable" class="param-table"></table>
+      <div class="code-header">
+        <span>Strategy Source Code</span>
+        <div class="code-actions">
+          <a id="downloadBtn" class="icon-link" title="Download .py file">⬇ Download .py</a>
+          <button id="runBtn" class="run-btn">▶ Run Again</button>
+        </div>
+      </div>
+      <pre><code id="sourceCode" class="language-python"></code></pre>
+    </section>
 
-    <h3>Analysis</h3>
-    <div id="narrative" class="narrative"></div>
-  </section>
-</main>
+    <!-- Backtest panel -->
+    <section id="backtest-panel" hidden>
+      <h2>Backtest Results</h2>
+      <div id="metricsRow" class="metrics-row"></div>
+
+      <div class="charts-grid">
+        <div class="chart-card full-width">
+          <h4>Equity Curve vs Buy &amp; Hold</h4>
+          <canvas id="equityChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Drawdown</h4>
+          <canvas id="drawdownChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Trade P&amp;L Distribution</h4>
+          <canvas id="pnlChart"></canvas>
+        </div>
+      </div>
+
+      <h3>Trade Log</h3>
+      <div class="table-wrap">
+        <table id="tradeLog">
+          <thead>
+            <tr>
+              <th>#</th><th>Entry</th><th>Exit</th>
+              <th>Entry $</th><th>Exit $</th><th>Size</th>
+              <th>P&amp;L</th><th>Return %</th><th>Days</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3>Analysis</h3>
+      <div id="narrative" class="narrative"></div>
+    </section>
+  </main>
+
+</div><!-- /.layout -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>

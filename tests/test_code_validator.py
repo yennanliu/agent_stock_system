@@ -115,6 +115,44 @@ class MyStrategy(Strategy):
         issues = api_conformance_check(code)
         assert any("buy" in i or "sell" in i for i in issues)
 
+    def test_self_sma_method_call_flagged(self):
+        """LLM bug: calling self.SMA(...) instead of module-level helper."""
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.sma = self.I(self.SMA, self.data.Close, 20)
+    def next(self):
+        self.buy()
+"""
+        issues = api_conformance_check(code)
+        assert any("SMA" in i and "instance method" in i for i in issues)
+
+    def test_self_rsi_method_call_flagged(self):
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.rsi = self.I(self.RSI, self.data.Close, 14)
+    def next(self):
+        self.buy()
+"""
+        issues = api_conformance_check(code)
+        assert any("RSI" in i and "instance method" in i for i in issues)
+
+    def test_module_level_sma_not_flagged(self):
+        """Using SMA directly (not self.SMA) must NOT be flagged."""
+        code = """
+class MyStrategy(Strategy):
+    def init(self):
+        self.sma = self.I(SMA, self.data.Close, 20)
+    def next(self):
+        if self.data.Close[-1] > self.sma[-1]:
+            self.buy()
+        else:
+            self.sell()
+"""
+        issues = api_conformance_check(code)
+        assert not any("instance method" in i for i in issues)
+
     def test_negative_index_not_flagged(self):
         """[-1] and [-2] are correct — must NOT be flagged."""
         code = """
