@@ -165,7 +165,7 @@ def get_backtest(run_id: int) -> dict | None:
 def list_strategies() -> list[dict]:
     with _conn() as con:
         rows = con.execute(
-            "SELECT id, ticker, name, description, created_at FROM strategies ORDER BY created_at DESC"
+            "SELECT id, ticker, name, description, created_at FROM strategies ORDER BY created_at DESC, id DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 

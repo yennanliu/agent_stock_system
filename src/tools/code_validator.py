@@ -6,6 +6,9 @@ FORBIDDEN_IMPORTS = {"os", "subprocess", "sys", "shutil", "socket", "builtins", 
 FORBIDDEN_BUILTINS = {"open", "eval", "compile"}
 # Note: __import__ is allowed but sandboxed — only numpy/pandas/math permitted at runtime
 
+# TA libraries not installed in the runtime sandbox
+UNAVAILABLE_TA_LIBS = {"ta", "talib", "pandas_ta", "finta", "stockstats", "ta_lib"}
+
 
 def syntax_check(src: str) -> list[str]:
     try:
@@ -90,14 +93,35 @@ def safety_check(src: str) -> list[str]:
         return []
 
     for node in ast.walk(tree):
-        # Forbidden imports
+        # Forbidden / unavailable imports
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.split(".")[0] in FORBIDDEN_IMPORTS:
+                root = alias.name.split(".")[0]
+                if root in FORBIDDEN_IMPORTS:
                     issues.append(f"Forbidden import: '{alias.name}'.")
+                elif root in UNAVAILABLE_TA_LIBS:
+                    issues.append(
+                        f"Unavailable TA library: '{alias.name}'. "
+                        "Rewrite using pd.Series and np operations only."
+                    )
         if isinstance(node, ast.ImportFrom):
-            if node.module and node.module.split(".")[0] in FORBIDDEN_IMPORTS:
-                issues.append(f"Forbidden import from: '{node.module}'.")
+            if node.module:
+                root = node.module.split(".")[0]
+                if root in FORBIDDEN_IMPORTS:
+                    issues.append(f"Forbidden import from: '{node.module}'.")
+                elif root in UNAVAILABLE_TA_LIBS:
+                    issues.append(
+                        f"Unavailable TA library: '{node.module}'. "
+                        "Rewrite using pd.Series and np operations only."
+                    )
+
+        # Attribute access on unavailable TA libs (e.g. ta.trend.sma_indicator)
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            if node.value.id in UNAVAILABLE_TA_LIBS:
+                issues.append(
+                    f"Unavailable TA library call: '{node.value.id}.{node.attr}'. "
+                    "Rewrite using pd.Series and np operations only."
+                )
 
         # Forbidden builtins
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):

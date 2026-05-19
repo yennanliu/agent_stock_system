@@ -16,8 +16,11 @@ def _rsi(series: pd.Series, period: int = 14) -> pd.Series:
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(period).mean()
     loss = (-delta.clip(upper=0)).rolling(period).mean()
-    rs = gain / loss.replace(0, np.nan)
-    return 100 - (100 / (1 + rs))
+    # loss == 0 means all-gain period → RSI = 100; avoid division by zero
+    rs = gain / loss.where(loss != 0, other=np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.where(loss != 0, other=100.0)
+    return rsi
 
 
 def _macd(series: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9):

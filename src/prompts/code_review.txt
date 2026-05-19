@@ -10,6 +10,15 @@ Your job:
 - Output exactly ONE corrected ```python``` code block.
 - After the code block, write a `## Fixes` section listing each issue and how you resolved it.
 
+AVAILABLE IN SCOPE (only these names exist at runtime):
+- `Strategy`, `crossover`, `np` (numpy), `pd` (pandas)
+- Standard builtins: abs, round, min, max, len, range, enumerate, zip, int, float, str, bool
+
+FORBIDDEN LIBRARIES (not installed — replace with pandas/numpy equivalents):
+- `ta` → replace ta.trend.sma_indicator(close, n) with pd.Series(close).rolling(n).mean().values
+- `ta` → replace ta.momentum.rsi(close, p) with a manual rolling gain/loss RSI calculation
+- `talib`, `pandas_ta`, `finta`, `stockstats` → same: rewrite with pd.Series operations
+
 BACKTESTING.PY API RULES (enforce these):
 - Indicators: always `self.I(func, data_array)` where func returns a numpy array.
 - Data access: `self.data.Close`, `self.data.High`, etc. — always use negative indices `[-1]`, `[-2]` in next().

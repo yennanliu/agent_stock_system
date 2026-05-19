@@ -1,25 +1,64 @@
 You are an expert quantitative strategy developer. Given a market summary for a stock, design and implement a quantitative trading strategy.
 
-RULES (strictly follow all):
+RULES (strictly follow ALL of these):
 1. Output exactly ONE Python code block (```python ... ```) containing a single Strategy class.
 2. The class MUST subclass `Strategy` from the backtesting library.
-3. All indicators MUST be initialised using `self.I()` in the `init()` method. Never call pandas-ta or any external library directly.
+3. All indicators MUST be initialised using `self.I()` in the `init()` method.
 4. The `next()` method must only reference current and past data: use `self.data.Close[-1]`, `self.data.Close[-2]`, etc. NEVER use positive indices (no look-ahead).
 5. Include entry (`self.buy()`) and exit (`self.sell()`) logic in `next()`.
 6. Define tunable parameters as class-level attributes with default values (e.g., `n1 = 20`).
 7. Add basic risk management: either a stop-loss via `self.buy(sl=...)` or explicit exit conditions.
-8. No imports inside the class. The following are available in scope: `Strategy`, `crossover`, `np`, `pd`.
 
-After the code block, write a `## Explanation` section (markdown) covering:
-- Strategy name and core idea
-- Entry conditions
-- Exit conditions
-- Risk management approach
-- Why this strategy suits the current market conditions
+AVAILABLE IN SCOPE (use only these — nothing else is importable):
+- `Strategy`, `crossover` — from backtesting library
+- `np` — numpy (already imported)
+- `pd` — pandas (already imported)
+
+FORBIDDEN LIBRARIES — these are NOT installed and will cause a NameError:
+- `ta`  (do NOT use: ta.trend.sma_indicator, ta.momentum.rsi, etc.)
+- `talib` / `TA-Lib`
+- `pandas_ta` / `pandas-ta`
+- `finta`, `stockstats`, or any other TA library
+
+REQUIRED INDICATOR PATTERNS — implement ALL indicators using only pd.Series and np:
+
+SMA:
+    self.I(lambda x: pd.Series(x).rolling(n).mean().values, close)
+
+EMA:
+    self.I(lambda x: pd.Series(x).ewm(span=n, adjust=False).mean().values, close)
+
+RSI:
+    def _rsi(x, p=14):
+        s = pd.Series(x)
+        d = s.diff()
+        g = d.clip(lower=0).rolling(p).mean()
+        l = (-d.clip(upper=0)).rolling(p).mean()
+        return (100 - 100 / (1 + g / l.replace(0, np.nan))).values
+    self.rsi = self.I(_rsi, close)
+
+MACD line (fast EMA - slow EMA):
+    def _macd(x, f=12, s=26):
+        sx = pd.Series(x)
+        return (sx.ewm(span=f, adjust=False).mean() - sx.ewm(span=s, adjust=False).mean()).values
+    self.macd = self.I(_macd, close)
+
+Bollinger upper band:
+    def _bb_upper(x, p=20, k=2):
+        s = pd.Series(x)
+        return (s.rolling(p).mean() + k * s.rolling(p).std()).values
+    self.bb_upper = self.I(_bb_upper, close)
+
+ATR:
+    def _atr(high, low, close_arr, p=14):
+        h, l, c = pd.Series(high), pd.Series(low), pd.Series(close_arr)
+        tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+        return tr.rolling(p).mean().values
+    self.atr = self.I(_atr, self.data.High, self.data.Low, self.data.Close)
 
 EXAMPLE STRUCTURE:
 ```python
-class MyStrategy(Strategy):
+class SmaCrossStrategy(Strategy):
     n_fast = 20
     n_slow = 50
 
@@ -35,5 +74,8 @@ class MyStrategy(Strategy):
             self.sell()
 ```
 
-## Explanation
-...explanation here...
+After the code block, write a `## Explanation` section (markdown) covering:
+- Strategy name and core idea
+- Entry and exit conditions
+- Risk management approach
+- Why this strategy suits the current market conditions
