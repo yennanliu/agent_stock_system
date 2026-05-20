@@ -251,8 +251,7 @@ if df.empty:
 
 df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
 df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
-print(f"  {{len(df)}} trading days loaded ({{}}{{}})".format(
-    df.index[0].date(), " → " + str(df.index[-1].date())))
+print(f"  {{len(df)}} trading days loaded ({{df.index[0].date()}} → {{df.index[-1].date()}})")
 
 # ── run backtest ──────────────────────────────────────────────────────────────
 bt = Backtest(df, StrategyClass, cash=args.cash, commission=0.002,

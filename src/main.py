@@ -376,6 +376,31 @@ async def playground_run(
     except UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="File must be UTF-8 encoded Python.")
 
+    # If the file is a runner script (*_run.py), extract only the Strategy class.
+    # Runner files contain argparse/yfinance code that can't run in the sandbox.
+    import ast as _ast
+    try:
+        tree = _ast.parse(source_code)
+        strategy_classes = [
+            node for node in _ast.walk(tree)
+            if isinstance(node, _ast.ClassDef)
+            and any(
+                (b.id if isinstance(b, _ast.Name) else getattr(b, "attr", "")) == "Strategy"
+                for b in node.bases
+            )
+        ]
+        if strategy_classes:
+            lines = source_code.splitlines()
+            cls_node = strategy_classes[0]
+            # Take from the class definition to the end of its block
+            end_line = max(
+                getattr(n, "end_lineno", cls_node.lineno)
+                for n in _ast.walk(cls_node)
+            )
+            source_code = "\n".join(lines[cls_node.lineno - 1 : end_line])
+    except SyntaxError:
+        pass  # let run_backtest report the real error
+
     # ── Build DataFrame ───────────────────────────────────────────────────────
     if data_mode == "real":
         try:
