@@ -29,8 +29,11 @@
   <!-- ── Left sidebar: history browser ── -->
   <aside id="sidebar">
     <div class="sidebar-header">
-      <span>Run History</span>
-      <button id="refreshHistoryBtn" class="icon-btn" title="Refresh">↻</button>
+      <span data-i18n="sidebar.history">Run History</span>
+      <div style="display:flex;gap:6px">
+        <button id="clearAllRunsBtn" class="icon-btn danger-btn" title="Clear all history" data-i18n="sidebar.clear_all">🗑 Clear All</button>
+        <button id="refreshHistoryBtn" class="icon-btn" title="Refresh" data-i18n="sidebar.refresh">↻</button>
+      </div>
     </div>
     <div id="historyList" class="history-list">
       <div class="history-empty">No runs yet. Analyze a ticker to get started.</div>
@@ -94,15 +97,15 @@
       <p id="strategyExplanation"></p>
       <table id="paramTable" class="param-table"></table>
       <div class="param-actions" id="paramActions" hidden>
-        <button id="runWithParamsBtn" class="run-btn">▶ Re-run with these params</button>
-        <button id="resetParamsBtn" class="icon-btn">↺ Reset</button>
+        <button id="runWithParamsBtn" class="run-btn" data-i18n="strategy.rerun_params">▶ Re-run with these params</button>
+        <button id="resetParamsBtn" class="icon-btn" data-i18n="strategy.reset_params">↺ Reset</button>
       </div>
       <div class="code-header">
-        <span>Strategy Source Code</span>
+        <span data-i18n="strategy.source_code">Strategy Source Code</span>
         <div class="code-actions">
-          <a id="downloadBtn" class="icon-link" title="Download strategy class .py">⬇ Strategy</a>
-          <a id="runnerBtn" class="icon-link" title="Download standalone runner script">⬇ Runner</a>
-          <button id="optimizeBtn" class="icon-btn" title="Grid-search best parameters">⚡ Optimize</button>
+          <a id="downloadBtn" class="icon-link" title="Download strategy class .py" data-i18n="strategy.download">⬇ Strategy</a>
+          <a id="runnerBtn" class="icon-link" title="Download standalone runner script" data-i18n="strategy.runner">⬇ Runner</a>
+          <button id="optimizeBtn" class="icon-btn" title="Grid-search best parameters" data-i18n="strategy.optimize">⚡ Optimize</button>
           <button id="runBtn" class="run-btn" data-i18n="strategy.run_again">▶ Run Again</button>
         </div>
       </div>
@@ -115,8 +118,8 @@
         <h2 data-i18n="backtest.title">Backtest Results</h2>
         <div class="run-actions">
           <span id="runIdBadge" class="run-id-badge"></span>
-          <a id="runSourceBtn" class="icon-link" title="Download strategy code for this run" hidden>⬇ Run Code</a>
-          <a id="runDataBtn" class="icon-link" title="Download raw OHLCV + indicator CSV" hidden>⬇ Raw Data</a>
+          <a id="runSourceBtn" class="icon-link" title="Download strategy code for this run" hidden data-i18n="backtest.run_code">⬇ Run Code</a>
+          <a id="runDataBtn" class="icon-link" title="Download raw OHLCV + indicator CSV" hidden data-i18n="backtest.raw_data">⬇ Raw Data</a>
         </div>
       </div>
       <div id="metricsRow" class="metrics-row"></div>
@@ -133,10 +136,10 @@
       <!-- Candlestick chart with buy/sell markers -->
       <div class="chart-card full-width" id="signalChartCard" hidden>
         <div class="signal-chart-header">
-          <h4>Candlestick Chart &amp; Trade Signals</h4>
+          <h4 data-i18n="backtest.candle_title">Candlestick Chart &amp; Trade Signals</h4>
           <div class="signal-legend">
-            <span class="legend-dot buy"></span>Buy
-            <span class="legend-dot sell"></span>Sell
+            <span class="legend-dot buy"></span><span data-i18n="backtest.buy">Buy</span>
+            <span class="legend-dot sell"></span><span data-i18n="backtest.sell">Sell</span>
           </div>
         </div>
         <div id="candleChart" style="height:320px;width:100%;"></div>
@@ -144,15 +147,15 @@
 
       <div class="charts-grid">
         <div class="chart-card full-width">
-          <h4>Equity Curve vs Buy &amp; Hold</h4>
+          <h4 data-i18n="backtest.equity_title">Equity Curve vs Buy &amp; Hold</h4>
           <canvas id="equityChart"></canvas>
         </div>
         <div class="chart-card">
-          <h4>Drawdown</h4>
+          <h4 data-i18n="backtest.dd_title">Drawdown</h4>
           <canvas id="drawdownChart"></canvas>
         </div>
         <div class="chart-card">
-          <h4>Trade P&amp;L Distribution</h4>
+          <h4 data-i18n="backtest.pnl_title">Trade P&amp;L Distribution</h4>
           <canvas id="pnlChart"></canvas>
         </div>
       </div>
@@ -162,9 +165,9 @@
         <table id="tradeLog">
           <thead>
             <tr>
-              <th>#</th><th>Entry</th><th>Exit</th>
-              <th>Entry $</th><th>Exit $</th><th>Size</th>
-              <th>P&amp;L</th><th>Return %</th><th>Days</th>
+              <th data-i18n="tl.num">#</th><th data-i18n="tl.entry">Entry</th><th data-i18n="tl.exit">Exit</th>
+              <th data-i18n="tl.ep">Entry $</th><th data-i18n="tl.xp">Exit $</th><th data-i18n="tl.size">Size</th>
+              <th data-i18n="tl.pnl">P&amp;L</th><th data-i18n="tl.ret">Return %</th><th data-i18n="tl.days">Days</th>
             </tr>
           </thead>
           <tbody></tbody>

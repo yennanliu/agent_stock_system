@@ -147,13 +147,13 @@ function renderResults(data) {
 // ── Metrics ───────────────────────────────────────────────────────────────────
 function renderMetrics(m) {
   const cards = [
-    { label:'Total Return', value:fmtPct(m.total_return_pct), pos:m.total_return_pct>0, sub:`B&H: ${fmtPct(m.buy_hold_return_pct)}` },
-    { label:'CAGR',         value:fmtPct(m.cagr_pct),         pos:m.cagr_pct>0 },
-    { label:'Sharpe',       value:fmt(m.sharpe),               pos:m.sharpe>1,    neg:m.sharpe<0 },
-    { label:'Max Drawdown', value:fmtPct(m.max_drawdown_pct),  neg:true },
-    { label:'Win Rate',     value:fmtPct(m.win_rate_pct),      pos:m.win_rate_pct>50 },
-    { label:'Profit Factor',value:m.profit_factor?fmt(m.profit_factor):'—', pos:(m.profit_factor||0)>1 },
-    { label:'Trades',       value:m.num_trades, sub:`Exposure: ${fmtPct(m.exposure_pct)}` },
+    { label:t('metric.total_return'), value:fmtPct(m.total_return_pct), pos:m.total_return_pct>0, sub:`${t('metric.bnh')}: ${fmtPct(m.buy_hold_return_pct)}` },
+    { label:t('metric.cagr'),         value:fmtPct(m.cagr_pct),         pos:m.cagr_pct>0 },
+    { label:t('metric.sharpe'),       value:fmt(m.sharpe),               pos:m.sharpe>1,    neg:m.sharpe<0 },
+    { label:t('metric.max_drawdown'), value:fmtPct(m.max_drawdown_pct),  neg:true },
+    { label:t('metric.win_rate'),     value:fmtPct(m.win_rate_pct),      pos:m.win_rate_pct>50 },
+    { label:t('metric.profit_factor'),value:m.profit_factor?fmt(m.profit_factor):'—', pos:(m.profit_factor||0)>1 },
+    { label:t('metric.trades'),       value:m.num_trades, sub:`${t('metric.exposure')}: ${fmtPct(m.exposure_pct)}` },
   ];
   $('pgMetrics').innerHTML = cards.map(c => `
     <div class="metric-card">
@@ -179,7 +179,7 @@ function renderWalkforward(wf) {
   ];
   $('pgWfTable').innerHTML = `
     <table class="wf-table">
-      <thead><tr><th>Metric</th><th>In-sample (70%)</th><th>Out-of-sample (30%)</th><th>Δ</th></tr></thead>
+      <thead><tr><th>${t('wf.metric')}</th><th>${t('wf.insample')} (70%)</th><th>${t('wf.outsample')} (30%)</th><th>${t('wf.delta')}</th></tr></thead>
       <tbody>${rows.map(([label, iv, ov, hg]) => {
         const d = (iv!=null&&ov!=null)?(ov-iv):null;
         const ds = d!=null?`${d>=0?'+':''}${fmt(d)}`:'—';

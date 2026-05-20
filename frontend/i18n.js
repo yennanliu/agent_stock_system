@@ -121,6 +121,34 @@ const TRANSLATIONS = {
     'pg.vol_high':      'High (turbulent)',
     'pg.period':        'Period',
     'pg.ticker':        'Ticker',
+
+    // Dynamic metric labels (used in JS renderMetrics)
+    'metric.total_return':  'Total Return',
+    'metric.cagr':          'CAGR',
+    'metric.sharpe':        'Sharpe',
+    'metric.max_drawdown':  'Max Drawdown',
+    'metric.win_rate':      'Win Rate',
+    'metric.profit_factor': 'Profit Factor',
+    'metric.trades':        'Trades',
+    'metric.bnh':           'B&H',
+    'metric.exposure':      'Exposure',
+
+    // Dynamic walk-forward labels
+    'wf.in_sample_full':   'In-sample\nfirst 70%',
+    'wf.out_sample_full':  'Out-of-sample\nlast 30%',
+
+    // Sidebar erase
+    'sidebar.clear_all':    '🗑 Clear All',
+    'sidebar.confirm_clear':'Delete ALL run history? This cannot be undone.',
+    'sidebar.confirm_del':  'Delete this run?',
+
+    // Run ID badge
+    'run.id_label':         'Run',
+    'run.path_label':       'File',
+
+    // Misc dynamic
+    'no_trades':            'No trades executed',
+    'code_review_label':    'Code Review',
   },
 
   'zh-TW': {
@@ -236,6 +264,34 @@ const TRANSLATIONS = {
     'pg.vol_high':      '高波動（動盪市場）',
     'pg.period':        '時間段',
     'pg.ticker':        '股票代號',
+
+    // Dynamic metric labels
+    'metric.total_return':  '總回報',
+    'metric.cagr':          '年化複合增長率',
+    'metric.sharpe':        '夏普比率',
+    'metric.max_drawdown':  '最大回撤',
+    'metric.win_rate':      '勝率',
+    'metric.profit_factor': '獲利因子',
+    'metric.trades':        '交易次數',
+    'metric.bnh':           '買入持有',
+    'metric.exposure':      '持倉暴露',
+
+    // Dynamic walk-forward labels
+    'wf.in_sample_full':   '樣本內\n前70%',
+    'wf.out_sample_full':  '樣本外\n後30%',
+
+    // Sidebar erase
+    'sidebar.clear_all':    '🗑 清除全部',
+    'sidebar.confirm_clear':'刪除所有執行歷史？此操作無法復原。',
+    'sidebar.confirm_del':  '刪除此次執行記錄？',
+
+    // Run ID badge
+    'run.id_label':         '執行',
+    'run.path_label':       '檔案',
+
+    // Misc dynamic
+    'no_trades':            '未執行任何交易',
+    'code_review_label':    '代碼審查',
   },
 };
 

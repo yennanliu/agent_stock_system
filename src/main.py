@@ -19,6 +19,8 @@ from src.tools.db import (
     get_run_raw_data_path,
     list_strategies,
     list_runs_for_ticker,
+    delete_backtest_run,
+    delete_all_runs,
     STRATEGIES_DIR,
 )
 from src.tools.job_queue import create_job, job_status, stream_job, start_pipeline_job
@@ -228,6 +230,22 @@ async def strategy_download(strategy_id: int):
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+@app.delete("/api/runs/{run_id}")
+async def delete_run(run_id: int):
+    """Delete a single backtest run and its files."""
+    if get_backtest(run_id) is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    delete_backtest_run(run_id)
+    return {"deleted": run_id}
+
+
+@app.delete("/api/runs")
+async def delete_runs_all():
+    """Delete all backtest runs."""
+    delete_all_runs()
+    return {"deleted": "all"}
+
+
 @app.get("/api/runs")
 async def all_runs():
     """All backtest runs across all tickers, newest first (for history browser)."""
@@ -235,7 +253,7 @@ async def all_runs():
     import json
     with _conn() as con:
         rows = con.execute(
-            """SELECT br.id, br.strategy_id, br.ticker, br.start_date, br.end_date,
+            """SELECT br.id, br.run_uuid, br.strategy_id, br.ticker, br.start_date, br.end_date,
                       br.metrics, br.created_at, s.name as strategy_name
                FROM backtest_runs br
                JOIN strategies s ON s.id = br.strategy_id

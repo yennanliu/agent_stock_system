@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import uuid as _uuid_module
 from typing import AsyncGenerator
 
 from crewai import Crew, Process
@@ -144,6 +145,7 @@ async def run_analyze_pipeline(
         lambda: generate_explanation(strategy_name, explanation, bt_result["metrics"]),
     )
 
+    run_uuid = str(_uuid_module.uuid4())
     run_id = save_backtest_run(
         strategy_id=strategy_id,
         ticker=ticker,
@@ -159,6 +161,7 @@ async def run_analyze_pipeline(
         price_series=bt_result["price_series"],
         signals=bt_result["signals"],
         walkforward=bt_result.get("walkforward"),
+        run_uuid=run_uuid,
     )
 
     m = bt_result["metrics"]
@@ -168,6 +171,7 @@ async def run_analyze_pipeline(
         f"Max DD: {m['max_drawdown_pct']}%",
         strategy_id=strategy_id,
         backtest_id=run_id,
+        run_uuid=run_uuid,
     )
 
     # ── Stage 5: Self-Critique & Revised Strategy ─────────────────────────────
@@ -238,6 +242,7 @@ async def run_analyze_pipeline(
         iterations=revised_review["iterations"],
         approved=revised_review["approved"],
     )
+    revised_run_uuid = str(_uuid_module.uuid4())
     revised_run_id = save_backtest_run(
         strategy_id=revised_sid,
         ticker=ticker,
@@ -253,6 +258,7 @@ async def run_analyze_pipeline(
         price_series=revised_bt["price_series"],
         signals=revised_bt["signals"],
         walkforward=revised_bt.get("walkforward"),
+        run_uuid=revised_run_uuid,
     )
 
     rm = revised_bt["metrics"]
@@ -302,6 +308,7 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         ),
     )
 
+    run_uuid = str(_uuid_module.uuid4())
     run_id = save_backtest_run(
         strategy_id=strategy_id,
         ticker=ticker,
@@ -317,6 +324,7 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         price_series=bt_result["price_series"],
         signals=bt_result["signals"],
         walkforward=bt_result.get("walkforward"),
+        run_uuid=run_uuid,
     )
 
     m = bt_result["metrics"]
@@ -326,4 +334,5 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         f"Max DD: {m['max_drawdown_pct']}%",
         strategy_id=strategy_id,
         backtest_id=run_id,
+        run_uuid=run_uuid,
     )

@@ -1,6 +1,7 @@
 import json
 import re
 import sqlite3
+import uuid as _uuid_module
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
     price_series    TEXT,
     signals         TEXT,
     walkforward     TEXT,
+    run_uuid        TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -63,6 +65,7 @@ ALTER TABLE backtest_runs ADD COLUMN raw_data_path TEXT;
 ALTER TABLE backtest_runs ADD COLUMN price_series TEXT;
 ALTER TABLE backtest_runs ADD COLUMN signals TEXT;
 ALTER TABLE backtest_runs ADD COLUMN walkforward TEXT;
+ALTER TABLE backtest_runs ADD COLUMN run_uuid TEXT;
 """
 
 RAW_DATA_DIR = Path("data/raw")
@@ -330,15 +333,18 @@ def save_backtest_run(
     price_series: list | None = None,
     signals: list | None = None,
     walkforward: dict | None = None,
+    run_uuid: str | None = None,
 ) -> int:
-    # Reserve a row ID first (needed for file paths)
+    if not run_uuid:
+        run_uuid = str(_uuid_module.uuid4())
+
     with _conn() as con:
         cur = con.execute(
             """INSERT INTO backtest_runs
                (strategy_id, ticker, start_date, end_date, initial_capital,
                 metrics, equity_curve, trade_log, explanation,
-                source_code, raw_data_path, price_series, signals, walkforward)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                source_code, raw_data_path, price_series, signals, walkforward, run_uuid)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 strategy_id, ticker, start_date, end_date, initial_capital,
                 json.dumps(metrics), json.dumps(equity_curve),
@@ -347,12 +353,13 @@ def save_backtest_run(
                 json.dumps(price_series or []),
                 json.dumps(signals or []),
                 json.dumps(walkforward or {}),
+                run_uuid,
             ),
         )
         run_id = cur.lastrowid
 
-    # Save code at strategies/{run_id}/{ticker}.py
-    _save_run_code(run_id, ticker, source_code)
+    # Save code at strategies/{run_uuid}/{ticker}.py
+    _save_run_code(run_id, ticker, source_code, run_uuid=run_uuid)
 
     # Save raw OHLCV+indicators CSV
     if raw_df is not None:
@@ -367,11 +374,13 @@ def save_backtest_run(
     return run_id
 
 
-def _save_run_code(run_id: int, ticker: str, source_code: str) -> None:
+def _save_run_code(run_id: int, ticker: str, source_code: str, run_uuid: str | None = None) -> None:
     if not source_code:
         return
-    path = _run_code_dir(run_id) / f"{ticker}.py"
-    path.write_text(source_code, encoding="utf-8")
+    dir_key = run_uuid if run_uuid else str(run_id)
+    code_dir = STRATEGIES_DIR / dir_key
+    code_dir.mkdir(parents=True, exist_ok=True)
+    (code_dir / f"{ticker}.py").write_text(source_code, encoding="utf-8")
 
 
 def get_strategy(strategy_id: int) -> dict | None:
@@ -409,18 +418,64 @@ def get_backtest(run_id: int) -> dict | None:
 
 
 def get_run_source_path(run_id: int) -> Path | None:
-    # Primary: strategies/{run_id}/{ticker}.py
+    # Try UUID-based dir first
+    with _conn() as con:
+        row = con.execute("SELECT run_uuid FROM backtest_runs WHERE id=?", (run_id,)).fetchone()
+    if row and row["run_uuid"]:
+        uuid_dir = STRATEGIES_DIR / row["run_uuid"]
+        candidates = list(uuid_dir.glob("*.py")) if uuid_dir.exists() else []
+        if candidates:
+            return candidates[0]
+    # Fall back to integer-ID dir (older runs)
     run_dir = STRATEGIES_DIR / str(run_id)
     if run_dir.exists():
         candidates = list(run_dir.glob("*.py"))
         if candidates:
             return candidates[0]
-    # Legacy fallback: data/runs/{run_id}_{ticker}.py
     import glob
     matches = glob.glob(str(RUN_CODE_DIR / f"{run_id}_*.py"))
-    if matches:
-        return Path(matches[0])
-    return None
+    return Path(matches[0]) if matches else None
+
+
+def delete_backtest_run(run_id: int) -> None:
+    """Delete a single backtest run and its associated files."""
+    with _conn() as con:
+        row = con.execute("SELECT run_uuid, raw_data_path FROM backtest_runs WHERE id=?", (run_id,)).fetchone()
+    if row:
+        # Remove strategy code dir
+        dir_key = row["run_uuid"] or str(run_id)
+        code_dir = STRATEGIES_DIR / dir_key
+        if code_dir.exists():
+            import shutil
+            shutil.rmtree(code_dir, ignore_errors=True)
+        # Remove raw data CSV
+        if row["raw_data_path"]:
+            try:
+                Path(row["raw_data_path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
+    with _conn() as con:
+        con.execute("DELETE FROM backtest_runs WHERE id=?", (run_id,))
+
+
+def delete_all_runs() -> None:
+    """Delete every backtest run (keeps strategies table intact)."""
+    with _conn() as con:
+        rows = con.execute("SELECT run_uuid, raw_data_path FROM backtest_runs").fetchall()
+    import shutil
+    for row in rows:
+        dir_key = row["run_uuid"] or ""
+        if dir_key:
+            code_dir = STRATEGIES_DIR / dir_key
+            if code_dir.exists():
+                shutil.rmtree(code_dir, ignore_errors=True)
+        if row["raw_data_path"]:
+            try:
+                Path(row["raw_data_path"]).unlink(missing_ok=True)
+            except Exception:
+                pass
+    with _conn() as con:
+        con.execute("DELETE FROM backtest_runs")
 
 
 def get_run_raw_data_path(run_id: int) -> Path | None:

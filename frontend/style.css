@@ -605,6 +605,30 @@ tbody tr:hover td { background: var(--surface2); }
   .metrics-row .metric-card { min-width: calc(50% - 7px); }
 }
 
+/* ── History item erase button ────────────────────────────── */
+.hi-ticker-row {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.hi-del-btn {
+  background: transparent; border: none; color: var(--text-muted);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px;
+  border-radius: 4px; opacity: 0; transition: opacity .15s, color .15s;
+}
+.history-item:hover .hi-del-btn { opacity: 1; }
+.hi-del-btn:hover { color: var(--red); }
+
+.hi-uuid {
+  font-size: 10px; color: var(--border2, #555); font-family: var(--mono);
+  margin-top: 1px; margin-bottom: 2px;
+}
+
+/* danger button (Clear All) */
+.danger-btn {
+  color: var(--text-muted);
+  font-size: 11px; padding: 4px 8px;
+}
+.danger-btn:hover { color: var(--red); border-color: var(--red); }
+
 /* ── Language switcher ────────────────────────────────────── */
 .lang-switcher {
   display: flex;

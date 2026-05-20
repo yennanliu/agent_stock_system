@@ -32,6 +32,7 @@ const paramActions       = $('paramActions');
 const runnerBtn          = $('runnerBtn');
 const optimizeBtn        = $('optimizeBtn');
 const applyOptimizedBtn  = $('applyOptimizedBtn');
+const clearAllRunsBtn    = $('clearAllRunsBtn');
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshHistoryList();
@@ -48,6 +49,7 @@ runWithParamsBtn.addEventListener('click', () => rerunWithParams());
 resetParamsBtn.addEventListener('click', () => resetParams());
 optimizeBtn.addEventListener('click', () => runOptimize());
 applyOptimizedBtn.addEventListener('click', () => applyOptimized());
+clearAllRunsBtn.addEventListener('click', () => clearAllRuns());
 
 // ── Analysis pipeline ─────────────────────────────────────────────────────────
 function startAnalysis(ticker) {
@@ -162,7 +164,7 @@ async function refreshHistoryList() {
 
 function renderHistoryList(runs) {
   if (!runs.length) {
-    historyList.innerHTML = '<div class="history-empty">No runs yet. Analyze a ticker to get started.</div>';
+    historyList.innerHTML = `<div class="history-empty">${t('sidebar.empty')}</div>`;
     return;
   }
   historyList.innerHTML = runs.map(r => {
@@ -171,17 +173,42 @@ function renderHistoryList(runs) {
     const retStr = ret !== undefined ? `${ret >= 0 ? '+' : ''}${fmt(ret)}%` : '—';
     const retCls = ret !== undefined ? (ret >= 0 ? 'pos' : 'neg') : '';
     const date = (r.created_at || '').slice(0, 10);
+    const uuid = r.run_uuid ? r.run_uuid.slice(0, 8) : String(r.id);
     return `<div class="history-item${r.id === activeHistoryId ? ' active' : ''}"
                  data-run-id="${r.id}" data-strat-id="${r.strategy_id}"
                  onclick="onHistoryClick(${r.id}, ${r.strategy_id})">
-      <div class="hi-ticker">${escHtml(r.ticker)}</div>
+      <div class="hi-ticker-row">
+        <span class="hi-ticker">${escHtml(r.ticker)}</span>
+        <button class="hi-del-btn" title="Delete" onclick="event.stopPropagation();deleteRun(${r.id})">×</button>
+      </div>
       <div class="hi-name">${escHtml(r.strategy_name || '')}</div>
+      <div class="hi-uuid">${uuid}</div>
       <div class="hi-meta">
         <span class="hi-ret ${retCls}">${retStr}</span>
         <span>${date}</span>
       </div>
     </div>`;
   }).join('');
+}
+
+async function deleteRun(runId) {
+  if (!confirm(t('sidebar.confirm_del'))) return;
+  await fetch(`/api/runs/${runId}`, { method: 'DELETE' });
+  if (activeHistoryId === runId) {
+    activeHistoryId = null;
+    strategyPanel.hidden = true;
+    backtestPanel.hidden = true;
+  }
+  refreshHistoryList();
+}
+
+async function clearAllRuns() {
+  if (!confirm(t('sidebar.confirm_clear'))) return;
+  await fetch('/api/runs', { method: 'DELETE' });
+  activeHistoryId = null;
+  strategyPanel.hidden = true;
+  backtestPanel.hidden = true;
+  refreshHistoryList();
 }
 
 async function onHistoryClick(runId, stratId) {
@@ -220,7 +247,7 @@ async function loadStrategy(id) {
     const ok = !!data.approved;
     badge.innerHTML = `
       <div class="review-badge ${ok ? 'approved' : 'rejected'}">
-        ${ok ? '✓' : '✗'} Code Review
+        ${ok ? '✓' : '✗'} ${t('code_review_label')}
         <span class="score">${data.confidence ?? '—'}/100</span>
         · ${(data.issues_found || []).length} issues · ${data.iterations ?? 0} iter
       </div>`;
@@ -234,7 +261,7 @@ async function loadStrategy(id) {
   const paramTable = $('paramTable');
   if (Object.keys(params).length) {
     paramTable.innerHTML =
-      '<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>' +
+      `<thead><tr><th>${t('strategy.param_header')}</th><th>${t('strategy.param_value')}</th></tr></thead><tbody>` +
       Object.entries(params).map(([k, v]) =>
         `<tr><td>${escHtml(k)}</td><td>` +
         `<input class="param-input" data-param="${escHtml(k)}" type="number" value="${escHtml(String(v))}" step="any" /></td></tr>`
@@ -266,9 +293,12 @@ async function loadBacktest(id) {
   $('narrative').innerHTML = marked.parse(data.explanation || '');
 
   // Run ID badge + download buttons
-  const ticker = data.ticker || '';
-  runIdBadge.textContent = `Run #${id}  ·  strategies/${id}/${ticker}.py`;
-  runIdBadge.title = `Code saved at strategies/${id}/${ticker}.py`;
+  const ticker  = data.ticker || '';
+  const uuid    = data.run_uuid || String(id);
+  const uuidShort = uuid.slice(0, 8);
+  const filePath  = `strategies/${uuid}/${ticker}.py`;
+  runIdBadge.textContent = `${t('run.id_label')} ${uuidShort}  ·  ${filePath}`;
+  runIdBadge.title = `UUID: ${uuid}\n${t('run.path_label')}: ${filePath}`;
 
   runSourceBtn.href = `/api/backtest/${id}/source`;
   runSourceBtn.download = `run_${id}_${ticker}.py`;
@@ -414,13 +444,13 @@ function renderCritiquePreview(critique, changesSummary) {
 // ── Metrics ───────────────────────────────────────────────────────────────────
 function renderMetrics(m) {
   const cards = [
-    { label: 'Total Return', value: fmt(m.total_return_pct, '%'), pos: m.total_return_pct > 0, sub: `B&H: ${fmt(m.buy_hold_return_pct, '%')}` },
-    { label: 'CAGR',         value: fmt(m.cagr_pct, '%'),         pos: m.cagr_pct > 0 },
-    { label: 'Sharpe',       value: fmt(m.sharpe),                 pos: m.sharpe > 1, neg: m.sharpe < 0 },
-    { label: 'Max Drawdown', value: fmt(m.max_drawdown_pct, '%'),  neg: true },
-    { label: 'Win Rate',     value: fmt(m.win_rate_pct, '%'),      pos: m.win_rate_pct > 50 },
-    { label: 'Profit Factor',value: m.profit_factor ? fmt(m.profit_factor) : '—', pos: (m.profit_factor || 0) > 1 },
-    { label: 'Trades',       value: m.num_trades,                  sub: `Exposure: ${fmt(m.exposure_pct, '%')}` },
+    { label: t('metric.total_return'), value: fmt(m.total_return_pct, '%'), pos: m.total_return_pct > 0, sub: `${t('metric.bnh')}: ${fmt(m.buy_hold_return_pct, '%')}` },
+    { label: t('metric.cagr'),         value: fmt(m.cagr_pct, '%'),         pos: m.cagr_pct > 0 },
+    { label: t('metric.sharpe'),       value: fmt(m.sharpe),                 pos: m.sharpe > 1, neg: m.sharpe < 0 },
+    { label: t('metric.max_drawdown'), value: fmt(m.max_drawdown_pct, '%'),  neg: true },
+    { label: t('metric.win_rate'),     value: fmt(m.win_rate_pct, '%'),      pos: m.win_rate_pct > 50 },
+    { label: t('metric.profit_factor'),value: m.profit_factor ? fmt(m.profit_factor) : '—', pos: (m.profit_factor || 0) > 1 },
+    { label: t('metric.trades'),       value: m.num_trades,                  sub: `${t('metric.exposure')}: ${fmt(m.exposure_pct, '%')}` },
   ];
   $('metricsRow').innerHTML = cards.map(c => `
     <div class="metric-card">
@@ -451,10 +481,10 @@ function renderWalkforward(wf) {
   $('walkforwardTable').innerHTML = `
     <table class="wf-table">
       <thead><tr>
-        <th>Metric</th>
-        <th>In-sample<br><small>first 70%</small></th>
-        <th>Out-of-sample<br><small>last 30%</small></th>
-        <th>Δ</th>
+        <th>${t('wf.metric')}</th>
+        <th>${t('wf.insample')}<br><small>${t('wf.in_sample_full').split('\n')[1]||'first 70%'}</small></th>
+        <th>${t('wf.outsample')}<br><small>${t('wf.out_sample_full').split('\n')[1]||'last 30%'}</small></th>
+        <th>${t('wf.delta')}</th>
       </tr></thead>
       <tbody>
         ${rows.map(([label, iv, ov, higherGood]) => {
@@ -530,7 +560,7 @@ function renderPnlChart(trades) {
 function renderTradeLog(trades) {
   const tbody = $('tradeLog').querySelector('tbody');
   if (!trades || !trades.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">No trades executed</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">${t('no_trades')}</td></tr>`;
     return;
   }
   tbody.innerHTML = trades.map((t, i) => `

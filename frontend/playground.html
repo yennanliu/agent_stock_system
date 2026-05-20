@@ -138,20 +138,20 @@
 
     <!-- Data config -->
     <div class="config-card">
-      <h3>Data Source</h3>
+      <h3 data-i18n="pg.data_source">Data Source</h3>
       <div class="config-row">
-        <label>Mode</label>
+        <label data-i18n="pg.mode">Mode</label>
         <select id="dataModeSelect">
-          <option value="synthetic" selected>Synthetic (no API key needed)</option>
-          <option value="real">Real market data (yfinance)</option>
+          <option value="synthetic" selected data-i18n="pg.mode_synth">Synthetic (no API key needed)</option>
+          <option value="real" data-i18n="pg.mode_real">Real market data (yfinance)</option>
         </select>
       </div>
       <div class="config-row real-only" id="tickerRow">
-        <label>Ticker</label>
+        <label data-i18n="pg.ticker">Ticker</label>
         <input id="tickerInput" type="text" value="NVDA" placeholder="e.g. NVDA" />
       </div>
       <div class="config-row real-only" id="periodRow">
-        <label>Period</label>
+        <label data-i18n="pg.period">Period</label>
         <select id="periodSelect">
           <option value="1y">1 Year</option>
           <option value="2y" selected>2 Years</option>
@@ -162,24 +162,24 @@
       <!-- Synthetic controls -->
       <div id="syntheticControls">
         <div class="config-row">
-          <label>Market Regime</label>
+          <label data-i18n="pg.regime">Market Regime</label>
           <select id="trendSelect">
-            <option value="up" selected>Bull Market (uptrend)</option>
-            <option value="down">Bear Market (downtrend)</option>
-            <option value="sideways">Sideways / Ranging</option>
-            <option value="volatile">High-Volatility / Stress</option>
+            <option value="up" selected data-i18n="pg.regime_bull">Bull Market (uptrend)</option>
+            <option value="down" data-i18n="pg.regime_bear">Bear Market (downtrend)</option>
+            <option value="sideways" data-i18n="pg.regime_side">Sideways / Ranging</option>
+            <option value="volatile" data-i18n="pg.regime_vol">High-Volatility / Stress</option>
           </select>
         </div>
         <div class="config-row">
-          <label>Volatility</label>
+          <label data-i18n="pg.volatility">Volatility</label>
           <select id="volatilitySelect">
-            <option value="low">Low (quiet market)</option>
-            <option value="medium" selected>Medium (normal)</option>
-            <option value="high">High (turbulent)</option>
+            <option value="low" data-i18n="pg.vol_low">Low (quiet market)</option>
+            <option value="medium" selected data-i18n="pg.vol_med">Medium (normal)</option>
+            <option value="high" data-i18n="pg.vol_high">High (turbulent)</option>
           </select>
         </div>
         <div class="config-row">
-          <label>Number of bars (trading days)</label>
+          <label data-i18n="pg.n_bars">Number of bars (trading days)</label>
           <input id="nBarsInput" type="number" value="504" min="60" max="2000" step="60" />
         </div>
       </div>
@@ -187,14 +187,14 @@
 
     <!-- Run config -->
     <div class="config-card">
-      <h3>Backtest Config</h3>
+      <h3 data-i18n="pg.backtest_cfg">Backtest Config</h3>
       <div class="config-row">
-        <label>Initial Capital ($)</label>
+        <label data-i18n="pg.capital">Initial Capital ($)</label>
         <input id="capitalInput" type="number" value="10000" min="1000" step="1000" />
       </div>
     </div>
 
-    <button class="run-btn-lg" id="runBtn" disabled>▶ Run Backtest</button>
+    <button class="run-btn-lg" id="runBtn" disabled data-i18n="pg.run">▶ Run Backtest</button>
 
   </aside>
 
@@ -205,8 +205,8 @@
 
     <!-- Empty state -->
     <div id="pgEmpty" style="color:var(--text-muted);padding:60px 0;text-align:center;font-size:14px">
-      Upload a strategy file on the left to get started.<br><br>
-      <small>Download strategy files from the <a href="/app" style="color:var(--accent)">Analyzer</a> using the <strong>⬇ Strategy</strong> or <strong>⬇ Runner</strong> button.</small>
+      <span data-i18n="pg.empty">Upload a strategy file on the left to get started.</span><br><br>
+      <small>Download strategy files from the <a href="/app" style="color:var(--accent)" data-i18n="nav.analyzer">Analyzer</a>.</small>
     </div>
 
     <!-- Results -->
