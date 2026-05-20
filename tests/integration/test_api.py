@@ -40,8 +40,14 @@ def test_health():
 
 # ── Static / pages ────────────────────────────────────────────────────────────
 
-def test_root_serves_html():
+def test_root_serves_landing():
     r = client.get("/")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+
+
+def test_app_serves_analyzer():
+    r = client.get("/app")
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
 

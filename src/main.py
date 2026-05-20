@@ -470,6 +470,11 @@ async def health():
 
 @app.get("/")
 async def root():
+    return FileResponse("frontend/landing.html")
+
+
+@app.get("/app")
+async def analyzer():
     return FileResponse("frontend/index.html")
 
 
