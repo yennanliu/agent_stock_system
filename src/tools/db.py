@@ -9,6 +9,12 @@ from src.config import DB_PATH
 STRATEGIES_DIR = Path("strategies")
 STRATEGIES_DIR.mkdir(exist_ok=True)
 
+# Per-run code lives at strategies/{run_id}/{ticker}.py
+def _run_code_dir(run_id: int) -> Path:
+    d = STRATEGIES_DIR / str(run_id)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS strategies (
     id          INTEGER PRIMARY KEY,
@@ -44,6 +50,8 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
     explanation     TEXT,
     source_code     TEXT,
     raw_data_path   TEXT,
+    price_series    TEXT,
+    signals         TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -51,6 +59,8 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
 _MIGRATE_SQL = """
 ALTER TABLE backtest_runs ADD COLUMN source_code TEXT;
 ALTER TABLE backtest_runs ADD COLUMN raw_data_path TEXT;
+ALTER TABLE backtest_runs ADD COLUMN price_series TEXT;
+ALTER TABLE backtest_runs ADD COLUMN signals TEXT;
 """
 
 RAW_DATA_DIR = Path("data/raw")
@@ -167,63 +177,49 @@ def save_backtest_run(
     trade_log: list,
     explanation: str,
     source_code: str = "",
-    raw_df=None,  # optional pd.DataFrame of OHLCV + indicators
+    raw_df=None,           # optional pd.DataFrame of OHLCV + indicators
+    price_series: list | None = None,
+    signals: list | None = None,
 ) -> int:
-    import pandas as pd
-
-    raw_data_path: str | None = None
-    if raw_df is not None:
-        # Reserve an ID first so the filename matches
-        with _conn() as con:
-            cur = con.execute(
-                """INSERT INTO backtest_runs
-                   (strategy_id, ticker, start_date, end_date, initial_capital,
-                    metrics, equity_curve, trade_log, explanation, source_code, raw_data_path)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (
-                    strategy_id, ticker, start_date, end_date, initial_capital,
-                    json.dumps(metrics), json.dumps(equity_curve),
-                    json.dumps(trade_log), explanation, source_code, None,
-                ),
-            )
-            run_id = cur.lastrowid
-
-        csv_path = RAW_DATA_DIR / f"{run_id}_{ticker}.csv"
-        raw_df.to_csv(csv_path)
-        raw_data_path = str(csv_path)
-
-        with _conn() as con:
-            con.execute(
-                "UPDATE backtest_runs SET raw_data_path=? WHERE id=?",
-                (raw_data_path, run_id),
-            )
-
-        # Save per-run code snapshot
-        _save_run_code(run_id, ticker, source_code)
-        return run_id
-
+    # Reserve a row ID first (needed for file paths)
     with _conn() as con:
         cur = con.execute(
             """INSERT INTO backtest_runs
                (strategy_id, ticker, start_date, end_date, initial_capital,
-                metrics, equity_curve, trade_log, explanation, source_code, raw_data_path)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                metrics, equity_curve, trade_log, explanation,
+                source_code, raw_data_path, price_series, signals)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 strategy_id, ticker, start_date, end_date, initial_capital,
                 json.dumps(metrics), json.dumps(equity_curve),
-                json.dumps(trade_log), explanation, source_code, raw_data_path,
+                json.dumps(trade_log), explanation,
+                source_code, None,
+                json.dumps(price_series or []),
+                json.dumps(signals or []),
             ),
         )
         run_id = cur.lastrowid
 
+    # Save code at strategies/{run_id}/{ticker}.py
     _save_run_code(run_id, ticker, source_code)
+
+    # Save raw OHLCV+indicators CSV
+    if raw_df is not None:
+        csv_path = RAW_DATA_DIR / f"{run_id}_{ticker}.csv"
+        raw_df.to_csv(csv_path)
+        with _conn() as con:
+            con.execute(
+                "UPDATE backtest_runs SET raw_data_path=? WHERE id=?",
+                (str(csv_path), run_id),
+            )
+
     return run_id
 
 
 def _save_run_code(run_id: int, ticker: str, source_code: str) -> None:
     if not source_code:
         return
-    path = RUN_CODE_DIR / f"{run_id}_{ticker}.py"
+    path = _run_code_dir(run_id) / f"{ticker}.py"
     path.write_text(source_code, encoding="utf-8")
 
 
@@ -255,23 +251,24 @@ def get_backtest(run_id: int) -> dict | None:
     if row is None:
         return None
     d = dict(row)
-    for key in ("metrics", "equity_curve", "trade_log"):
+    for key in ("metrics", "equity_curve", "trade_log", "price_series", "signals"):
         if d.get(key):
             d[key] = json.loads(d[key])
     return d
 
 
 def get_run_source_path(run_id: int) -> Path | None:
-    path = RUN_CODE_DIR / f"{run_id}_*.py"
+    # Primary: strategies/{run_id}/{ticker}.py
+    run_dir = STRATEGIES_DIR / str(run_id)
+    if run_dir.exists():
+        candidates = list(run_dir.glob("*.py"))
+        if candidates:
+            return candidates[0]
+    # Legacy fallback: data/runs/{run_id}_{ticker}.py
     import glob
     matches = glob.glob(str(RUN_CODE_DIR / f"{run_id}_*.py"))
     if matches:
         return Path(matches[0])
-    # Fall back: check DB for ticker
-    row = get_backtest(run_id)
-    if row:
-        p = RUN_CODE_DIR / f"{run_id}_{row['ticker']}.py"
-        return p if p.exists() else None
     return None
 
 

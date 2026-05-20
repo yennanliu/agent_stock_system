@@ -98,6 +98,19 @@
       </div>
       <div id="metricsRow" class="metrics-row"></div>
 
+      <!-- Price chart with animated buy/sell signals -->
+      <div class="chart-card full-width" id="signalChartCard" hidden>
+        <div class="signal-chart-header">
+          <h4>Price Action &amp; Trade Signals</h4>
+          <div class="signal-legend">
+            <span class="legend-dot buy"></span>Buy
+            <span class="legend-dot sell"></span>Sell
+          </div>
+          <button id="replayBtn" class="replay-btn" title="Replay animation">⟳ Replay</button>
+        </div>
+        <canvas id="signalChart"></canvas>
+      </div>
+
       <div class="charts-grid">
         <div class="chart-card full-width">
           <h4>Equity Curve vs Buy &amp; Hold</h4>

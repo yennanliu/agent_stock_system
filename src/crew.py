@@ -55,18 +55,30 @@ async def run_analyze_pipeline(
     await asyncio.sleep(0)
 
     task = build_strategy_task(ticker, summary, strategy_type=strategy_type, indicators=indicators)
-    crew = Crew(
-        agents=[strategy_agent],
-        tasks=[task],
-        process=Process.sequential,
-        verbose=False,
-    )
-    try:
-        result = await asyncio.get_event_loop().run_in_executor(None, crew.kickoff)
-        raw_output = str(result)
-        source_code, explanation = parse_strategy_response(raw_output)
-    except Exception as e:
-        yield _sse("error", f"Strategy generation failed: {e}")
+
+    source_code, explanation = None, ""
+    last_err = None
+    for attempt in range(1, 4):
+        if attempt > 1:
+            yield _sse("strategy", f"Retrying strategy generation (attempt {attempt}/3)…")
+            await asyncio.sleep(0)
+        crew = Crew(
+            agents=[strategy_agent],
+            tasks=[task],
+            process=Process.sequential,
+            verbose=False,
+        )
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(None, crew.kickoff)
+            raw_output = str(result)
+            source_code, explanation = parse_strategy_response(raw_output)
+            break
+        except Exception as e:
+            last_err = e
+            log.warning("Strategy generation attempt %d failed: %s", attempt, e)
+
+    if source_code is None:
+        yield _sse("error", f"Strategy generation failed after 3 attempts: {last_err}")
         return
 
     strategy_name = extract_strategy_name(source_code)
@@ -144,6 +156,8 @@ async def run_analyze_pipeline(
         explanation=narrative,
         source_code=approved_code,
         raw_df=df,
+        price_series=bt_result["price_series"],
+        signals=bt_result["signals"],
     )
 
     m = bt_result["metrics"]
@@ -205,6 +219,8 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         explanation=narrative,
         source_code=source_code,
         raw_df=df,
+        price_series=bt_result["price_series"],
+        signals=bt_result["signals"],
     )
 
     m = bt_result["metrics"]

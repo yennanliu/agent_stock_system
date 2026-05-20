@@ -146,10 +146,31 @@ def run_backtest(
     except Exception as e:
         raise RuntimeError(f"Backtest simulation failed: {e}") from e
 
+    trade_log = _trade_log(stats)
+
+    # Price series for the prediction-vs-actual chart
+    price_series = [
+        {"date": str(idx.date()), "close": round(float(v), 4)}
+        for idx, v in df["Close"].items()
+    ]
+
+    # Buy/sell signals derived from trade log (date only, no timestamp)
+    def _date_str(v):
+        return str(v)[:10] if v else ""
+
+    signals = []
+    for t in trade_log:
+        if t["entry_date"]:
+            signals.append({"date": _date_str(t["entry_date"]), "type": "buy",  "price": t["entry_price"]})
+        if t["exit_date"]:
+            signals.append({"date": _date_str(t["exit_date"]),  "type": "sell", "price": t["exit_price"]})
+
     return {
         "metrics": _extract_metrics(stats),
         "equity_curve": _equity_series(stats),
-        "trade_log": _trade_log(stats),
+        "trade_log": trade_log,
+        "price_series": price_series,
+        "signals": signals,
         "start_date": str(df.index[0].date()),
         "end_date": str(df.index[-1].date()),
     }

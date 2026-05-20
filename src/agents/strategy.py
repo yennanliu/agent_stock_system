@@ -13,11 +13,26 @@ class ParseError(Exception):
 
 
 def parse_strategy_response(raw: str) -> tuple[str, str]:
-    """Extract (source_code, explanation) from an LLM response."""
-    code_match = re.search(r"```python\s*(.*?)```", raw, re.DOTALL)
-    if not code_match:
+    """Extract (source_code, explanation) from an LLM response.
+
+    Tries several fallback patterns in order:
+    1. ```python ... ```   (ideal)
+    2. ``` ... ```         (fence without language tag)
+    3. Bare class definition starting with 'class ... (Strategy)'
+    """
+    # 1. Fenced with python tag
+    m = re.search(r"```python\s*(.*?)```", raw, re.DOTALL)
+    if not m:
+        # 2. Any fenced block
+        m = re.search(r"```\s*(class\s+\w.*?)```", raw, re.DOTALL)
+    if not m:
+        # 3. Raw class body — find first 'class ... (Strategy):' and take everything after
+        m = re.search(r"(class\s+\w+\s*\(Strategy\).*)", raw, re.DOTALL)
+
+    if not m:
         raise ParseError("No ```python ... ``` block found in strategy response.")
-    source_code = code_match.group(1).strip()
+
+    source_code = m.group(1).strip()
 
     expl_match = re.search(r"##\s*Explanation\s*(.*)", raw, re.DOTALL)
     explanation = expl_match.group(1).strip() if expl_match else ""

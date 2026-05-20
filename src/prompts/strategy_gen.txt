@@ -35,9 +35,10 @@ FORBIDDEN — these patterns will cause runtime errors:
 - Calling `ta.*`, `talib.*`, etc.
 - Any `import` statement at all — everything you need is already in scope. Do NOT write `import backtesting`, `import backtesting as bt`, `import numpy`, `import pandas`, etc.
 - `backtesting.indicators.*` or `bt.indicators.*` — this submodule does NOT exist.
-- `backtesting.lib.SMA`, `backtesting.lib.RSI`, `backtesting.lib.EMA`, etc. — `backtesting.lib` only has `crossover`, `cross`, `barssince`, `resample_apply`. It has NO indicator functions. Use the TA helpers listed above (e.g. `self.I(SMA, close, n)`).
+- `backtesting.lib.SMA`, `backtesting.lib.RSI`, `backtesting.lib.EMA`, etc. — `backtesting.lib` only has `crossover`, `cross`, `barssince`, `resample_apply`. It has NO indicator functions. Use the TA helpers listed above (e.g. `self.I(SMA, self.data.Close, n)`).
 - Defining indicators as instance methods (e.g. `self.SMA(...)`) — call the module-level helpers directly.
-- `np.convolve(values, weights, mode='valid')` for a moving average — this returns a SHORTER array and breaks the `self.I()` length contract. **Use `self.I(SMA, close, n)` instead.**
+- Bare variable names `close`, `high`, `low`, `open`, `volume` passed to `self.I()` — these are NOT in scope. Always use `self.data.Close`, `self.data.High`, `self.data.Low` directly. Never write `close = self.data.Close` and then pass `close` to `self.I()`.
+- `np.convolve(values, weights, mode='valid')` for a moving average — this returns a SHORTER array and breaks the `self.I()` length contract. **Use `self.I(SMA, self.data.Close, n)` instead.**
 - Any function passed to `self.I()` that returns an array shorter than the input. Length MUST be preserved (rolling/ewm-based math is fine; convolve with mode='valid' is not).
 - Using `mode='valid'` anywhere — it truncates output.
 
@@ -51,10 +52,9 @@ class SmaRsiStrategy(Strategy):
     rsi_overbought = 65
 
     def init(self):
-        close = self.data.Close
-        self.sma_fast = self.I(SMA, close, self.fast)
-        self.sma_slow = self.I(SMA, close, self.slow)
-        self.rsi = self.I(RSI, close, self.rsi_period)
+        self.sma_fast = self.I(SMA, self.data.Close, self.fast)
+        self.sma_slow = self.I(SMA, self.data.Close, self.slow)
+        self.rsi = self.I(RSI, self.data.Close, self.rsi_period)
         self.atr = self.I(ATR, self.data.High, self.data.Low, self.data.Close, 14)
 
     def next(self):

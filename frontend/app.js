@@ -4,7 +4,8 @@
 let currentStrategyId = null;
 let currentBacktestId = null;
 let activeHistoryId   = null;
-let equityChart = null, drawdownChart = null, pnlChart = null;
+let equityChart = null, drawdownChart = null, pnlChart = null, signalChart = null;
+let _signalAnimData = null;  // cached for replay
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -20,6 +21,7 @@ const downloadBtn        = $('downloadBtn');
 const runIdBadge         = $('runIdBadge');
 const runSourceBtn       = $('runSourceBtn');
 const runDataBtn         = $('runDataBtn');
+const replayBtn          = $('replayBtn');
 const historyList        = $('historyList');
 const refreshHistBtn     = $('refreshHistoryBtn');
 
@@ -34,6 +36,7 @@ analyzeBtn.addEventListener('click', () => {
 tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeBtn.click(); });
 runBtn.addEventListener('click', () => rerunStrategy());
 refreshHistBtn.addEventListener('click', refreshHistoryList);
+replayBtn.addEventListener('click', () => { if (_signalAnimData) animateSignalChart(_signalAnimData); });
 
 // ── Analysis pipeline ─────────────────────────────────────────────────────────
 function startAnalysis(ticker) {
@@ -192,8 +195,9 @@ async function loadBacktest(id) {
   $('narrative').innerHTML = marked.parse(data.explanation || '');
 
   // Run ID badge + download buttons
-  runIdBadge.textContent = `Run #${id}`;
   const ticker = data.ticker || '';
+  runIdBadge.textContent = `Run #${id}  ·  strategies/${id}/${ticker}.py`;
+  runIdBadge.title = `Code saved at strategies/${id}/${ticker}.py`;
 
   runSourceBtn.href = `/api/backtest/${id}/source`;
   runSourceBtn.download = `run_${id}_${ticker}.py`;
@@ -203,7 +207,120 @@ async function loadBacktest(id) {
   runDataBtn.download = `run_${id}_${ticker}_raw.csv`;
   runDataBtn.hidden = !data.raw_data_path;
 
+  // Signal animation chart
+  if (data.price_series && data.price_series.length) {
+    $('signalChartCard').hidden = false;
+    _signalAnimData = { prices: data.price_series, signals: data.signals || [], ticker };
+    animateSignalChart(_signalAnimData);
+  } else {
+    $('signalChartCard').hidden = true;
+  }
+
   backtestPanel.hidden = false;
+}
+
+// ── Signal animation chart ────────────────────────────────────────────────────
+function animateSignalChart({ prices, signals, ticker }) {
+  if (signalChart) signalChart.destroy();
+
+  // Build a date→close lookup for signal marker positioning
+  const priceMap = {};
+  prices.forEach(p => { priceMap[p.date] = p.close; });
+
+  // Scatter datasets for buy / sell signals (empty at start — filled during animation)
+  const buyPoints  = [];
+  const sellPoints = [];
+  const buyDates   = new Set(signals.filter(s => s.type === 'buy').map(s => s.date));
+  const sellDates  = new Set(signals.filter(s => s.type === 'sell').map(s => s.date));
+
+  const allDates  = prices.map(p => p.date);
+  const allPrices = prices.map(p => p.close);
+
+  signalChart = new Chart($('signalChart'), {
+    type: 'line',
+    data: {
+      labels: allDates,
+      datasets: [
+        {
+          label: `${ticker} Close`,
+          data: [],           // filled progressively
+          borderColor: '#6c8eff',
+          borderWidth: 1.8,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.2,
+          order: 3,
+        },
+        {
+          label: 'Buy',
+          data: [],
+          type: 'scatter',
+          pointStyle: 'triangle',
+          pointRadius: 8,
+          pointHoverRadius: 10,
+          backgroundColor: 'rgba(52,211,153,0.9)',
+          borderColor: '#34d399',
+          borderWidth: 1,
+          order: 1,
+          showLine: false,
+        },
+        {
+          label: 'Sell',
+          data: [],
+          type: 'scatter',
+          pointStyle: 'rectRot',
+          pointRadius: 8,
+          pointHoverRadius: 10,
+          backgroundColor: 'rgba(248,113,113,0.9)',
+          borderColor: '#f87171',
+          borderWidth: 1,
+          order: 2,
+          showLine: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      animation: false,   // we handle animation manually
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#8892a4', font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: '#1a1d27', borderColor: '#2d3148', borderWidth: 1,
+          titleColor: '#e2e8f0', bodyColor: '#8892a4',
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#8892a4', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: '#1e2235' } },
+        y: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: '#1e2235' },
+             title: { display: true, text: 'Price ($)', color: '#8892a4', font: { size: 11 } } },
+      },
+    },
+  });
+
+  // Animate: reveal one bar per frame, reveal signals when their date arrives
+  let frame = 0;
+  const totalFrames = allDates.length;
+  const msPerFrame  = Math.max(4, Math.min(16, 4000 / totalFrames)); // target ~4s total
+
+  function tick() {
+    if (frame >= totalFrames) return;
+
+    const date  = allDates[frame];
+    const price = allPrices[frame];
+
+    signalChart.data.datasets[0].data.push(price);
+
+    if (buyDates.has(date))  signalChart.data.datasets[1].data.push({ x: date, y: priceMap[date] * 0.985 });
+    if (sellDates.has(date)) signalChart.data.datasets[2].data.push({ x: date, y: priceMap[date] * 1.015 });
+
+    signalChart.update('none');
+    frame++;
+    setTimeout(tick, msPerFrame);
+  }
+
+  tick();
 }
 
 // ── Metrics ───────────────────────────────────────────────────────────────────

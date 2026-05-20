@@ -75,6 +75,38 @@ def api_conformance_check(src: str) -> list[str]:
                 "Use negative indices (e.g., [-1], [-2])."
             )
 
+    # Bare OHLCV names used in self.I() without prior assignment in init()
+    # e.g. self.I(SMA, close, 20) where `close` was never assigned.
+    # Walk each method body to collect assigned names, then check self.I() args.
+    _OHLCV_BARE = {"close", "high", "low", "open", "volume",
+                   "Close", "High", "Low", "Open", "Volume"}
+    for method in ast.walk(cls):
+        if not isinstance(method, ast.FunctionDef):
+            continue
+        assigned: set[str] = set()
+        for stmt in ast.walk(method):
+            if isinstance(stmt, ast.Assign):
+                for t in stmt.targets:
+                    if isinstance(t, ast.Name):
+                        assigned.add(t.id)
+            # Check every self.I() call in this method
+            if (
+                isinstance(stmt, ast.Call)
+                and isinstance(stmt.func, ast.Attribute)
+                and isinstance(stmt.func.value, ast.Name)
+                and stmt.func.value.id == "self"
+                and stmt.func.attr == "I"
+                and len(stmt.args) >= 2
+            ):
+                data_arg = stmt.args[1]
+                if isinstance(data_arg, ast.Name) and data_arg.id in _OHLCV_BARE:
+                    if data_arg.id not in assigned:
+                        issues.append(
+                            f"Bare name '{data_arg.id}' used in self.I() but never assigned in this method. "
+                            f"Use self.data.Close (or .High/.Low) directly: "
+                            f"self.I(FUNC, self.data.Close, n)."
+                        )
+
     # buy() or sell() present
     has_order = any(
         isinstance(node, ast.Call)
@@ -99,7 +131,7 @@ def api_conformance_check(src: str) -> list[str]:
         ):
             issues.append(
                 f"TA helper '{node.attr}' called as instance method (self.{node.attr}). "
-                f"Use the module-level helper directly: self.I({node.attr}, close, n)."
+                f"Use the module-level helper directly: self.I({node.attr}, self.data.Close, n)."
             )
 
     # np.convolve() truncates output unless mode='same' is used — and even then
@@ -116,7 +148,7 @@ def api_conformance_check(src: str) -> list[str]:
             issues.append(
                 "np.convolve() returns a shorter array than the input and breaks "
                 "self.I() length contract. Use the SMA(values, n) helper instead: "
-                "self.I(SMA, close, n)."
+                "self.I(SMA, self.data.Close, n)."
             )
 
     # mode='valid' anywhere truncates arrays — usually paired with convolve/correlate
