@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evaluation Guide · Stock Quant System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    /* ── Guide-specific layout ── */
+    .guide-layout {
+      display: flex; gap: 0; max-width: 1200px; margin: 0 auto;
+      padding: 32px 28px; align-items: flex-start;
+    }
+    .guide-toc {
+      width: 220px; flex-shrink: 0;
+      position: sticky; top: 80px;
+      padding-right: 28px; border-right: 1px solid var(--border);
+      margin-right: 40px;
+    }
+    .guide-toc h3 { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 14px; }
+    .toc-link {
+      display: block; font-size: 13px; color: var(--text-muted);
+      padding: 6px 0; border-left: 2px solid transparent;
+      padding-left: 12px; transition: color .2s, border-color .2s;
+      text-decoration: none;
+    }
+    .toc-link:hover    { color: var(--text); border-left-color: var(--border2, #353b5c); }
+    .toc-link.active   { color: var(--accent); border-left-color: var(--accent); }
+    .toc-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                         letter-spacing: .06em; color: var(--border2,#555); margin: 14px 0 4px 12px; }
+
+    .guide-content { flex: 1; min-width: 0; }
+
+    /* Sections */
+    .guide-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px 36px; margin-bottom: 24px;
+      scroll-margin-top: 80px;
+    }
+    .guide-section h2 {
+      font-size: 22px; font-weight: 800; margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .section-icon { font-size: 24px; }
+    .guide-section .intro { font-size: 15px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.7; }
+
+    /* Metric cards inside sections */
+    .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .mg-card {
+      background: var(--surface2, #1c2030); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+    }
+    .mg-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .mg-card .formula {
+      font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      background: var(--surface3, #242840); padding: 6px 10px; border-radius: 6px;
+      margin: 8px 0; color: var(--accent); display: inline-block;
+    }
+    .mg-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+    /* Threshold table */
+    .thresh-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+    .thresh-table th {
+      text-align: left; padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted);
+    }
+    .thresh-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    .thresh-table tbody tr:last-child td { border-bottom: none; }
+    .thresh-table tbody tr:hover { background: var(--surface3, #242840); }
+    .tag { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+    .tag.good { background:rgba(61,232,160,.12);  color:var(--green); }
+    .tag.ok   { background:rgba(251,191,36,.12);  color:var(--yellow); }
+    .tag.warn { background:rgba(255,107,107,.12); color:var(--red); }
+
+    /* Callout boxes */
+    .callout {
+      border-left: 3px solid; border-radius: 0 8px 8px 0;
+      padding: 14px 18px; margin: 16px 0; font-size: 14px; line-height: 1.65;
+    }
+    .callout.tip    { border-color: var(--green);  background: rgba(61,232,160,.06); }
+    .callout.warn   { border-color: var(--yellow); background: rgba(251,191,36,.06); }
+    .callout.danger { border-color: var(--red);    background: rgba(255,107,107,.06); }
+    .callout strong { font-weight: 700; }
+
+    /* Quick-reference table */
+    .quick-ref { width:100%; border-collapse:collapse; font-size:13px; }
+    .quick-ref th { background:var(--surface3,#242840); padding:10px 14px; text-align:left;
+                    font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); }
+    .quick-ref td { padding:10px 14px; border-bottom:1px solid var(--border); }
+    .quick-ref tbody tr:hover { background:var(--surface2,#1c2030); }
+
+    @media (max-width: 900px) {
+      .guide-toc { display: none; }
+      .guide-section { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <span class="logo">⬛ Stock Quant System</span>
+    <span class="tagline" data-i18n="tagline.guide">How to Evaluate Quantitative Trading Results</span>
+    <nav style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px">
+      <a href="/" style="color:var(--text-muted);text-decoration:none" data-i18n="nav.analyzer">Analyzer</a>
+      <a href="/api/playground" style="color:var(--text-muted);text-decoration:none" data-i18n="nav.playground">🧪 Playground</a>
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW')">中文</button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="guide-layout">
+
+  <!-- Table of contents -->
+  <aside class="guide-toc">
+    <h3 data-i18n="guide.toc">Contents</h3>
+    <div class="toc-section-title" data-i18n="guide.toc_returns">Returns</div>
+    <a class="toc-link" href="#returns" data-i18n="guide.s1_title">Total Return & CAGR</a>
+    <a class="toc-link" href="#risk" data-i18n="guide.s2_title">Risk-Adjusted Returns</a>
+    <a class="toc-link" href="#drawdown" data-i18n="guide.s3_title">Drawdown Analysis</a>
+    <div class="toc-section-title" data-i18n="guide.toc_trades">Trades</div>
+    <a class="toc-link" href="#winrate" data-i18n="guide.s4_title">Win Rate & Profit Factor</a>
+    <a class="toc-link" href="#exposure" data-i18n="guide.s5_title">Exposure & Trade Count</a>
+    <div class="toc-section-title" data-i18n="guide.toc_valid">Validation</div>
+    <a class="toc-link" href="#walkforward" data-i18n="guide.s6_title">Walk-Forward Validation</a>
+    <a class="toc-link" href="#pitfalls" data-i18n="guide.s7_title">Common Pitfalls</a>
+    <a class="toc-link" href="#quickref" data-i18n="guide.s8_title">Quick Reference</a>
+  </aside>
+
+  <!-- Content -->
+  <main class="guide-content">
+
+    <!-- ── Section 1: Returns ── -->
+    <section class="guide-section" id="returns">
+      <h2><span class="section-icon">📈</span> <span data-i18n="guide.s1_title">Total Return & CAGR</span></h2>
+      <p class="intro" data-i18n="guide.s1_intro">
+        The most basic question: did the strategy make money? But raw return without context is meaningless — a 50% return over 10 years underperforms a savings account.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.total_return">Total Return</h4>
+          <div class="formula">(final_equity − initial) / initial × 100</div>
+          <p data-i18n="guide.total_return_desc">Raw percentage gain over the full backtest period. Always compare against buy-and-hold for the same period to judge whether the strategy added value.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.cagr">CAGR (Annualised Return)</h4>
+          <div class="formula">(end/start)^(1/years) − 1</div>
+          <p data-i18n="guide.cagr_desc">Compounded Annual Growth Rate normalises return to a yearly figure. This is the right metric for comparing strategies across different time horizons.</p>
+        </div>
+      </div>
+      <table class="thresh-table">
+        <thead><tr><th data-i18n="guide.th_cagr">CAGR Range</th><th data-i18n="guide.th_context">Context</th><th data-i18n="guide.th_rating">Rating</th></tr></thead>
+        <tbody>
+          <tr><td>&gt; 25% / yr</td><td data-i18n="guide.cagr_r1">Exceptional — verify not overfit</td><td><span class="tag good">Excellent</span></td></tr>
+          <tr><td>15–25% / yr</td><td data-i18n="guide.cagr_r2">Strong outperformance vs. S&amp;P 500 (~10%)</td><td><span class="tag good">Good</span></td></tr>
+          <tr><td>8–15% / yr</td><td data-i18n="guide.cagr_r3">Competitive — check risk metrics</td><td><span class="tag ok">Acceptable</span></td></tr>
+          <tr><td>&lt; 8% / yr</td><td data-i18n="guide.cagr_r4">Below index; trading costs may not be worth it</td><td><span class="tag warn">Poor</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── Section 2: Risk-Adjusted ── -->
+    <section class="guide-section" id="risk">
+      <h2><span class="section-icon">⚖️</span> <span data-i18n="guide.s2_title">Risk-Adjusted Returns</span></h2>
+      <p class="intro" data-i18n="guide.s2_intro">
+        A strategy that returns 30% by taking enormous risk is worse than one returning 20% with low volatility. Risk-adjusted metrics quantify the return per unit of risk.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.sharpe">Sharpe Ratio</h4>
+          <div class="formula">(Rp − Rf) / σp</div>
+          <p data-i18n="guide.sharpe_desc">Return above risk-free rate per unit of total volatility. The industry standard for comparing strategies. Values above 1.0 are considered acceptable; above 2.0 is excellent. Assumes returns are normally distributed.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.calmar">Calmar Ratio</h4>
+          <div class="formula">CAGR / |Max Drawdown|</div>
+          <p data-i18n="guide.calmar_desc">Return per unit of worst-case loss. Less sensitive to short-term noise than Sharpe. A Calmar above 1.0 means the strategy earned back its worst drawdown in a year.</p>
+        </div>
+      </div>
+      <table class="thresh-table">
+        <thead><tr><th data-i18n="guide.th_metric">Metric</th><th data-i18n="guide.th_poor">Poor</th><th data-i18n="guide.th_ok">Acceptable</th><th data-i18n="guide.th_good">Good</th><th data-i18n="guide.th_excellent">Excellent</th></tr></thead>
+        <tbody>
+          <tr><td>Sharpe Ratio</td><td><span class="tag warn">&lt; 0.5</span></td><td><span class="tag ok">0.5–1.0</span></td><td><span class="tag good">1.0–2.0</span></td><td><span class="tag good">&gt; 2.0</span></td></tr>
+          <tr><td>Calmar Ratio</td><td><span class="tag warn">&lt; 0.5</span></td><td><span class="tag ok">0.5–1.0</span></td><td><span class="tag good">1.0–2.0</span></td><td><span class="tag good">&gt; 2.0</span></td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong data-i18n="guide.sharpe_warning_title">⚠ Sharpe on short backtests is unreliable.</strong>
+        <span data-i18n="guide.sharpe_warning_body"> A 6-month backtest with 5 trades has no statistical power. Require at least 30+ trades and 2+ years of data before trusting a Sharpe ratio.</span>
+      </div>
+    </section>
+
+    <!-- ── Section 3: Drawdown ── -->
+    <section class="guide-section" id="drawdown">
+      <h2><span class="section-icon">📉</span> <span data-i18n="guide.s3_title">Drawdown Analysis</span></h2>
+      <p class="intro" data-i18n="guide.s3_intro">
+        Drawdown measures how much the strategy lost from its peak before recovering. This is the lived experience of the investor — a strategy with a −60% drawdown will be abandoned before recovery.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.maxdd">Maximum Drawdown</h4>
+          <div class="formula">(trough − peak) / peak × 100</div>
+          <p data-i18n="guide.maxdd_desc">The worst peak-to-trough decline in the backtest. This is a hard floor — if you can't stomach this loss psychologically, you will exit the strategy at the worst time.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.dd_duration">Drawdown Duration</h4>
+          <div class="formula">days from peak to new high</div>
+          <p data-i18n="guide.dd_duration_desc">How long it takes to recover from the worst drawdown. A strategy with −20% drawdown that takes 3 years to recover is far worse than one that recovers in 3 months.</p>
+        </div>
+      </div>
+      <table class="thresh-table">
+        <thead><tr><th data-i18n="guide.th_maxdd">Max Drawdown</th><th data-i18n="guide.th_interpretation">Interpretation</th><th data-i18n="guide.th_rating">Rating</th></tr></thead>
+        <tbody>
+          <tr><td>0% to −10%</td><td data-i18n="guide.dd_r1">Low risk, typical for bond-like strategies</td><td><span class="tag good">Excellent</span></td></tr>
+          <tr><td>−10% to −25%</td><td data-i18n="guide.dd_r2">Acceptable for equity strategies</td><td><span class="tag ok">Good</span></td></tr>
+          <tr><td>−25% to −50%</td><td data-i18n="guide.dd_r3">High risk — most investors will capitulate</td><td><span class="tag warn">Risky</span></td></tr>
+          <tr><td>&gt; −50%</td><td data-i18n="guide.dd_r4">Extreme — only viable with small position size</td><td><span class="tag warn">Dangerous</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── Section 4: Win Rate ── -->
+    <section class="guide-section" id="winrate">
+      <h2><span class="section-icon">🎯</span> <span data-i18n="guide.s4_title">Win Rate & Profit Factor</span></h2>
+      <p class="intro" data-i18n="guide.s4_intro">
+        Win rate alone is meaningless. A strategy that wins 90% of the time but loses 10× on each loss is a disaster. The combination of win rate and average win/loss size determines profitability.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.winrate">Win Rate</h4>
+          <div class="formula">winning_trades / total_trades × 100</div>
+          <p data-i18n="guide.winrate_desc">Percentage of trades that close with a profit. Trend-following strategies often have low win rates (30–45%) but large average wins. Mean-reversion strategies often have high win rates (60–80%) but smaller wins.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.profit_factor">Profit Factor</h4>
+          <div class="formula">gross_profit / gross_loss</div>
+          <p data-i18n="guide.profit_factor_desc">Total profit divided by total loss in absolute terms. A Profit Factor above 1.0 means the strategy is profitable. Above 1.5 is good; above 2.0 is excellent. Below 1.0 means losing money overall.</p>
+        </div>
+      </div>
+      <div class="callout tip">
+        <strong data-i18n="guide.consistency_tip">💡 Consistency check:</strong>
+        <span data-i18n="guide.consistency_body"> Win Rate × Average Win should exceed (1 − Win Rate) × Average Loss. A 40% win rate is fine if average win = $3 and average loss = $1. Check both numbers in the trade log.</span>
+      </div>
+    </section>
+
+    <!-- ── Section 5: Exposure ── -->
+    <section class="guide-section" id="exposure">
+      <h2><span class="section-icon">⏱️</span> <span data-i18n="guide.s5_title">Exposure & Trade Count</span></h2>
+      <p class="intro" data-i18n="guide.s5_intro">
+        How much time is the strategy in the market? Low exposure means lower risk but also means the strategy misses most of the data — and statistical significance suffers.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.exposure">Exposure Time</h4>
+          <div class="formula">bars_in_position / total_bars × 100</div>
+          <p data-i18n="guide.exposure_desc">Percentage of time with an open position. Very low exposure (&lt;5%) often means the strategy rarely trades — a few lucky trades inflate the metrics. Very high exposure (&gt;95%) suggests the strategy is always in the market.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.trade_count">Trade Count</h4>
+          <div class="formula">number of closed trades</div>
+          <p data-i18n="guide.trade_count_desc">Statistical significance requires a minimum of ~30 trades. Fewer than 10 trades makes any metric — Sharpe, win rate, profit factor — statistically meaningless. More trades = more reliable statistics.</p>
+        </div>
+      </div>
+      <div class="callout danger">
+        <strong data-i18n="guide.few_trades_title">🚨 Fewer than 10 trades:</strong>
+        <span data-i18n="guide.few_trades_body"> Any Sharpe ratio or win rate computed from fewer than 10 trades is noise, not signal. Increase the backtest period or use the Strategy Playground to test on synthetic data with more bars.</span>
+      </div>
+    </section>
+
+    <!-- ── Section 6: Walk-Forward ── -->
+    <section class="guide-section" id="walkforward">
+      <h2><span class="section-icon">🔬</span> <span data-i18n="guide.s6_title">Walk-Forward Validation</span></h2>
+      <p class="intro" data-i18n="guide.s6_intro">
+        Walk-forward validation is the most important test for detecting overfitting. A strategy tuned on all available data will always look good in-sample — the question is whether it works on data it has never seen.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.insample">In-Sample (first 70%)</h4>
+          <p data-i18n="guide.insample_desc">The "training" period. Strategies optimised on this data will naturally perform well here. High in-sample performance alone proves nothing.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.outsample">Out-of-Sample (last 30%)</h4>
+          <p data-i18n="guide.outsample_desc">The "test" period the strategy never saw during optimisation. This is the only honest measure of real-world performance. Look for consistent (not necessarily equal) performance.</p>
+        </div>
+      </div>
+      <table class="thresh-table">
+        <thead><tr><th data-i18n="guide.th_pattern">Pattern</th><th data-i18n="guide.th_diagnosis">Diagnosis</th><th data-i18n="guide.th_action">Action</th></tr></thead>
+        <tbody>
+          <tr>
+            <td data-i18n="guide.wf_p1">OOS Sharpe ≥ IS Sharpe × 0.7</td>
+            <td data-i18n="guide.wf_d1">Robust — strategy generalises well</td>
+            <td><span class="tag good" data-i18n="guide.wf_a1">Deploy</span></td>
+          </tr>
+          <tr>
+            <td data-i18n="guide.wf_p2">OOS Sharpe 0.3–0.7× IS</td>
+            <td data-i18n="guide.wf_d2">Partial decay — some overfitting</td>
+            <td><span class="tag ok" data-i18n="guide.wf_a2">Investigate</span></td>
+          </tr>
+          <tr>
+            <td data-i18n="guide.wf_p3">OOS Sharpe &lt; 0.3× IS or negative</td>
+            <td data-i18n="guide.wf_d3">Overfit — performance doesn't transfer</td>
+            <td><span class="tag warn" data-i18n="guide.wf_a3">Discard</span></td>
+          </tr>
+          <tr>
+            <td data-i18n="guide.wf_p4">OOS positive, IS negative</td>
+            <td data-i18n="guide.wf_d4">Lucky OOS — likely random noise</td>
+            <td><span class="tag warn" data-i18n="guide.wf_a4">Discard</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ── Section 7: Pitfalls ── -->
+    <section class="guide-section" id="pitfalls">
+      <h2><span class="section-icon">⚠️</span> <span data-i18n="guide.s7_title">Common Pitfalls</span></h2>
+      <p class="intro" data-i18n="guide.s7_intro">Most backtest results are too good to be true. Here are the most common reasons a backtest fails in live trading.</p>
+
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4 data-i18n="guide.lookahead">Look-Ahead Bias</h4>
+          <p data-i18n="guide.lookahead_desc">Using future data to make a past decision. Example: using tomorrow's closing price to decide whether to buy today. This system validates against it with AST checks, but always inspect the strategy logic manually.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.overfitting">Overfitting</h4>
+          <p data-i18n="guide.overfitting_desc">Tuning parameters until the strategy looks perfect on historical data. The walk-forward validation in this system is specifically designed to detect this. A strategy with 10+ parameters and 50 trades is almost certainly overfit.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.survivorship">Survivorship Bias</h4>
+          <p data-i18n="guide.survivorship_desc">Testing only on stocks that still exist today ignores all the companies that went bankrupt or were delisted. This system uses yfinance which only provides current tickers — be aware of this limitation.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.slippage">Slippage & Costs</h4>
+          <p data-i18n="guide.slippage_desc">This system uses a 0.2% commission per trade. Real trading also incurs bid-ask spread, market impact, and borrowing costs for shorts. High-frequency strategies are most affected — a strategy with 200 trades/year loses 40% of CAGR to commission alone at 0.2%.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.regime">Regime Change</h4>
+          <p data-i18n="guide.regime_desc">A strategy tuned on the 2020–2022 bull market will struggle in a bear market. Use the Strategy Playground to stress-test across bear/sideways/volatile regimes before trusting any backtest result.</p>
+        </div>
+        <div class="mg-card">
+          <h4 data-i18n="guide.data_snooping">Data Snooping</h4>
+          <p data-i18n="guide.data_snooping_desc">Running hundreds of strategy variants and picking the best one inflates apparent performance. If you generate 50 strategies and take the best Sharpe, expect at least 3× degradation in live trading. Use walk-forward validation and limit post-hoc selection.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Section 8: Quick Reference ── -->
+    <section class="guide-section" id="quickref">
+      <h2><span class="section-icon">📋</span> <span data-i18n="guide.s8_title">Quick Reference</span></h2>
+      <p class="intro" data-i18n="guide.s8_intro">Bookmark this table. At a glance — what each metric means and what values to target.</p>
+      <table class="quick-ref">
+        <thead>
+          <tr>
+            <th data-i18n="guide.qr_metric">Metric</th>
+            <th data-i18n="guide.qr_formula">Formula / Definition</th>
+            <th data-i18n="guide.qr_poor">Poor</th>
+            <th data-i18n="guide.qr_good">Good</th>
+            <th data-i18n="guide.qr_excellent">Excellent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Total Return</td><td data-i18n="guide.qr_tr_def">(End − Start) / Start</td><td><span class="tag warn">&lt; 0%</span></td><td><span class="tag ok">&gt; 0%</span></td><td><span class="tag good">&gt; B&H</span></td></tr>
+          <tr><td>CAGR</td><td data-i18n="guide.qr_cagr_def">Annualised return</td><td><span class="tag warn">&lt; 5%</span></td><td><span class="tag ok">8–15%</span></td><td><span class="tag good">&gt; 20%</span></td></tr>
+          <tr><td>Sharpe Ratio</td><td data-i18n="guide.qr_sharpe_def">Return / Volatility</td><td><span class="tag warn">&lt; 0.5</span></td><td><span class="tag ok">1.0–2.0</span></td><td><span class="tag good">&gt; 2.0</span></td></tr>
+          <tr><td>Calmar Ratio</td><td data-i18n="guide.qr_calmar_def">CAGR / Max DD</td><td><span class="tag warn">&lt; 0.5</span></td><td><span class="tag ok">0.5–1.5</span></td><td><span class="tag good">&gt; 1.5</span></td></tr>
+          <tr><td>Max Drawdown</td><td data-i18n="guide.qr_dd_def">Worst peak-to-trough</td><td><span class="tag warn">&gt; −50%</span></td><td><span class="tag ok">−10 to −25%</span></td><td><span class="tag good">0 to −10%</span></td></tr>
+          <tr><td>Win Rate</td><td data-i18n="guide.qr_wr_def">Winning / Total trades</td><td><span class="tag warn">&lt; 30%*</span></td><td><span class="tag ok">40–60%</span></td><td><span class="tag good">&gt; 60%</span></td></tr>
+          <tr><td>Profit Factor</td><td data-i18n="guide.qr_pf_def">Gross profit / Gross loss</td><td><span class="tag warn">&lt; 1.0</span></td><td><span class="tag ok">1.2–1.5</span></td><td><span class="tag good">&gt; 1.5</span></td></tr>
+          <tr><td>Trade Count</td><td data-i18n="guide.qr_tc_def">Closed positions</td><td><span class="tag warn">&lt; 10</span></td><td><span class="tag ok">10–50</span></td><td><span class="tag good">&gt; 50</span></td></tr>
+          <tr><td>OOS / IS Sharpe</td><td data-i18n="guide.qr_wf_def">Walk-forward ratio</td><td><span class="tag warn">&lt; 0.3×</span></td><td><span class="tag ok">0.3–0.7×</span></td><td><span class="tag good">&gt; 0.7×</span></td></tr>
+        </tbody>
+      </table>
+      <div class="callout tip" style="margin-top:16px">
+        <strong>* </strong><span data-i18n="guide.winrate_note">Win Rate context: 30% win rate is fine for trend-following if average win is 3× average loss (expectancy = 0.3×3 − 0.7×1 = +0.2 per trade).</span>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/static/i18n.js"></script>
+<script>
+// Guide-specific translations
+const guideEn = {
+  'guide.toc':'Contents','guide.toc_returns':'Returns','guide.toc_trades':'Trades','guide.toc_valid':'Validation',
+  'guide.s1_title':'Total Return & CAGR','guide.s2_title':'Risk-Adjusted Returns',
+  'guide.s3_title':'Drawdown Analysis','guide.s4_title':'Win Rate & Profit Factor',
+  'guide.s5_title':'Exposure & Trade Count','guide.s6_title':'Walk-Forward Validation',
+  'guide.s7_title':'Common Pitfalls','guide.s8_title':'Quick Reference',
+  'guide.s1_intro':'The most basic question: did the strategy make money? But raw return without context is meaningless — a 50% return over 10 years underperforms a savings account.',
+  'guide.s2_intro':'A strategy that returns 30% by taking enormous risk is worse than one returning 20% with low volatility. Risk-adjusted metrics quantify the return per unit of risk.',
+  'guide.s3_intro':'Drawdown measures how much the strategy lost from its peak before recovering. This is the lived experience of the investor — a strategy with a −60% drawdown will be abandoned before recovery.',
+  'guide.s4_intro':'Win rate alone is meaningless. A strategy that wins 90% of the time but loses 10× on each loss is a disaster. The combination of win rate and average win/loss size determines profitability.',
+  'guide.s5_intro':'How much time is the strategy in the market? Low exposure means lower risk but also means the strategy misses most of the data — and statistical significance suffers.',
+  'guide.s6_intro':'Walk-forward validation is the most important test for detecting overfitting. A strategy tuned on all available data will always look good in-sample — the question is whether it works on data it has never seen.',
+  'guide.s7_intro':'Most backtest results are too good to be true. Here are the most common reasons a backtest fails in live trading.',
+  'guide.s8_intro':'Bookmark this table. At a glance — what each metric means and what values to target.',
+  'guide.total_return':'Total Return','guide.cagr':'CAGR (Annualised Return)',
+  'guide.total_return_desc':'Raw percentage gain over the full backtest period. Always compare against buy-and-hold for the same period.',
+  'guide.cagr_desc':'Compounded Annual Growth Rate normalises return to a yearly figure. The right metric for comparing strategies across different time horizons.',
+  'guide.th_cagr':'CAGR Range','guide.th_context':'Context','guide.th_rating':'Rating',
+  'guide.cagr_r1':'Exceptional — verify not overfit','guide.cagr_r2':'Strong outperformance vs. S&P 500',
+  'guide.cagr_r3':'Competitive — check risk metrics','guide.cagr_r4':'Below index; trading costs may not be worth it',
+  'guide.sharpe':'Sharpe Ratio','guide.calmar':'Calmar Ratio',
+  'guide.sharpe_desc':'Return above risk-free rate per unit of total volatility. Values above 1.0 are acceptable; above 2.0 is excellent.',
+  'guide.calmar_desc':'Return per unit of worst-case loss. A Calmar above 1.0 means the strategy earned back its worst drawdown in a year.',
+  'guide.th_metric':'Metric','guide.th_poor':'Poor','guide.th_ok':'Acceptable','guide.th_good':'Good','guide.th_excellent':'Excellent',
+  'guide.sharpe_warning_title':'⚠ Sharpe on short backtests is unreliable.','guide.sharpe_warning_body':' A 6-month backtest with 5 trades has no statistical power. Require at least 30+ trades and 2+ years.',
+  'guide.maxdd':'Maximum Drawdown','guide.dd_duration':'Drawdown Duration',
+  'guide.maxdd_desc':'The worst peak-to-trough decline. If you cannot stomach this loss psychologically, you will exit at the worst time.',
+  'guide.dd_duration_desc':'How long it takes to recover. A −20% drawdown that takes 3 years to recover is far worse than one that recovers in 3 months.',
+  'guide.th_maxdd':'Max Drawdown','guide.th_interpretation':'Interpretation',
+  'guide.dd_r1':'Low risk, typical for bond-like strategies','guide.dd_r2':'Acceptable for equity strategies',
+  'guide.dd_r3':'High risk — most investors will capitulate','guide.dd_r4':'Extreme — only viable with small position size',
+  'guide.winrate':'Win Rate','guide.profit_factor':'Profit Factor',
+  'guide.winrate_desc':'Percentage of trades that close with a profit. Trend-following strategies often have low win rates (30–45%) but large average wins.',
+  'guide.profit_factor_desc':'Total profit divided by total loss. Above 1.5 is good; above 2.0 is excellent.',
+  'guide.consistency_tip':'💡 Consistency check:','guide.consistency_body':' Win Rate × Average Win should exceed (1 − Win Rate) × Average Loss.',
+  'guide.exposure':'Exposure Time','guide.trade_count':'Trade Count',
+  'guide.exposure_desc':'Percentage of time with an open position. Very low exposure often means a few lucky trades inflate the metrics.',
+  'guide.trade_count_desc':'Statistical significance requires a minimum of ~30 trades. Fewer than 10 makes any metric statistically meaningless.',
+  'guide.few_trades_title':'🚨 Fewer than 10 trades:','guide.few_trades_body':' Any metric computed from fewer than 10 trades is noise, not signal.',
+  'guide.insample':'In-Sample (first 70%)','guide.outsample':'Out-of-Sample (last 30%)',
+  'guide.insample_desc':'The "training" period. High in-sample performance alone proves nothing.','guide.outsample_desc':'The only honest measure of real-world performance.',
+  'guide.th_pattern':'Pattern','guide.th_diagnosis':'Diagnosis','guide.th_action':'Action',
+  'guide.wf_p1':'OOS Sharpe ≥ IS Sharpe × 0.7','guide.wf_d1':'Robust — strategy generalises well','guide.wf_a1':'Deploy',
+  'guide.wf_p2':'OOS Sharpe 0.3–0.7× IS','guide.wf_d2':'Partial decay — some overfitting','guide.wf_a2':'Investigate',
+  'guide.wf_p3':'OOS Sharpe < 0.3× IS or negative','guide.wf_d3':'Overfit — performance does not transfer','guide.wf_a3':'Discard',
+  'guide.wf_p4':'OOS positive, IS negative','guide.wf_d4':'Lucky OOS — likely random noise','guide.wf_a4':'Discard',
+  'guide.lookahead':'Look-Ahead Bias','guide.overfitting':'Overfitting','guide.survivorship':'Survivorship Bias',
+  'guide.slippage':'Slippage & Costs','guide.regime':'Regime Change','guide.data_snooping':'Data Snooping',
+  'guide.lookahead_desc':'Using future data to make a past decision. This system validates against it with AST checks.',
+  'guide.overfitting_desc':'Tuning parameters until the strategy looks perfect on historical data. Walk-forward validation detects this.',
+  'guide.survivorship_desc':'Testing only on stocks that still exist today. yfinance only provides current tickers — be aware.',
+  'guide.slippage_desc':'This system uses 0.2% commission per trade. Real trading also incurs bid-ask spread and market impact.',
+  'guide.regime_desc':'A strategy tuned on a bull market will struggle in a bear. Use the Playground to stress-test across regimes.',
+  'guide.data_snooping_desc':'Running hundreds of variants and picking the best inflates apparent performance.',
+  'guide.qr_metric':'Metric','guide.qr_formula':'Definition','guide.qr_poor':'Poor','guide.qr_good':'Good','guide.qr_excellent':'Excellent',
+  'guide.qr_tr_def':'(End−Start)/Start','guide.qr_cagr_def':'Annualised return','guide.qr_sharpe_def':'Return/Volatility',
+  'guide.qr_calmar_def':'CAGR/MaxDD','guide.qr_dd_def':'Worst peak-to-trough','guide.qr_wr_def':'Winning/Total trades',
+  'guide.qr_pf_def':'Gross profit/Gross loss','guide.qr_tc_def':'Closed positions','guide.qr_wf_def':'Walk-forward ratio',
+  'guide.winrate_note':'Win Rate context: 30% win rate is fine for trend-following if average win is 3× average loss.',
+};
+const guideZhTW = {
+  'guide.toc':'目錄','guide.toc_returns':'報酬','guide.toc_trades':'交易','guide.toc_valid':'驗證',
+  'guide.s1_title':'總回報與年化報酬','guide.s2_title':'風險調整後報酬',
+  'guide.s3_title':'回撤分析','guide.s4_title':'勝率與獲利因子',
+  'guide.s5_title':'持倉暴露與交易次數','guide.s6_title':'前向驗證',
+  'guide.s7_title':'常見陷阱','guide.s8_title':'快速參考表',
+  'guide.s1_intro':'最基本的問題：策略是否賺錢？但沒有比較基準的絕對報酬是沒有意義的——10年內50%的回報低於定期存款。',
+  'guide.s2_intro':'以巨大風險換取30%回報的策略，劣於以低風險獲取20%的策略。風險調整後指標衡量每單位風險所得的報酬。',
+  'guide.s3_intro':'回撤衡量策略從峰值跌落多少後才復原。這是投資者的真實體驗——−60%的回撤策略通常在復原前就被放棄。',
+  'guide.s4_intro':'單獨的勝率毫無意義。90%勝率但每次損失10倍的策略是災難。勝率與平均盈虧規模的組合才決定獲利能力。',
+  'guide.s5_intro':'策略在市場中的持倉時間有多長？低暴露意味著低風險，但也意味著策略錯過了大部分數據，統計顯著性下降。',
+  'guide.s6_intro':'前向驗證是偵測過度擬合最重要的測試。在全部數據上優化的策略樣本內一定表現良好——問題是它在未見數據上是否有效。',
+  'guide.s7_intro':'大多數回測結果好得令人難以置信。以下是回測在實盤交易中失敗的最常見原因。',
+  'guide.s8_intro':'收藏此表。一眼了解每個指標的含義及目標值。',
+  'guide.total_return':'總回報','guide.cagr':'年化複合增長率（CAGR）',
+  'guide.total_return_desc':'整個回測期間的原始百分比收益。始終與同期買入持有策略比較，判斷策略是否創造超額價值。',
+  'guide.cagr_desc':'年化複合增長率將報酬標準化為年度數字，是跨不同時間段比較策略的正確指標。',
+  'guide.th_cagr':'CAGR 範圍','guide.th_context':'背景說明','guide.th_rating':'評級',
+  'guide.cagr_r1':'卓越——驗證是否過度擬合','guide.cagr_r2':'強勁跑贏標準普爾500指數（~10%）',
+  'guide.cagr_r3':'有競爭力——檢查風險指標','guide.cagr_r4':'低於指數；交易成本可能不值得',
+  'guide.sharpe':'夏普比率','guide.calmar':'卡馬比率',
+  'guide.sharpe_desc':'超過無風險利率的報酬除以總波動率。行業標準。1.0以上可接受，2.0以上為優秀。',
+  'guide.calmar_desc':'報酬除以最大回撤。卡馬比率高於1.0表示策略一年內可彌補最大回撤。',
+  'guide.th_metric':'指標','guide.th_poor':'差','guide.th_ok':'可接受','guide.th_good':'良好','guide.th_excellent':'優秀',
+  'guide.sharpe_warning_title':'⚠ 短期回測的夏普比率不可靠。','guide.sharpe_warning_body':' 5筆交易的6個月回測沒有統計效力。至少需要30+筆交易和2+年數據。',
+  'guide.maxdd':'最大回撤','guide.dd_duration':'回撤持續時間',
+  'guide.maxdd_desc':'回測中最嚴重的峰值至谷底跌幅。如果無法承受這種心理損失，您會在最壞的時機退出。',
+  'guide.dd_duration_desc':'從最大回撤恢復所需時間。−20%回撤需3年恢復，遠差於3個月恢復的情況。',
+  'guide.th_maxdd':'最大回撤','guide.th_interpretation':'解讀',
+  'guide.dd_r1':'低風險，適合類債券策略','guide.dd_r2':'適合股票策略',
+  'guide.dd_r3':'高風險——大多數投資者會放棄','guide.dd_r4':'極端——只適合小倉位',
+  'guide.winrate':'勝率','guide.profit_factor':'獲利因子',
+  'guide.winrate_desc':'獲利交易佔總交易的百分比。趨勢跟蹤策略通常勝率低（30-45%）但平均盈利大。',
+  'guide.profit_factor_desc':'總獲利除以總損失。高於1.5為良好，高於2.0為優秀，低於1.0意味著整體虧損。',
+  'guide.consistency_tip':'💡 一致性檢查：','guide.consistency_body':' 勝率×平均盈利 應超過 (1-勝率)×平均損失。',
+  'guide.exposure':'持倉暴露時間','guide.trade_count':'交易次數',
+  'guide.exposure_desc':'持有倉位的時間百分比。極低的暴露率通常意味著少數幸運交易虛高了指標。',
+  'guide.trade_count_desc':'統計顯著性至少需要~30筆交易。少於10筆時，任何指標在統計上都無意義。',
+  'guide.few_trades_title':'🚨 少於10筆交易：','guide.few_trades_body':' 任何基於少於10筆交易計算的指標都是噪音，不是信號。',
+  'guide.insample':'樣本內（前70%）','guide.outsample':'樣本外（後30%）',
+  'guide.insample_desc':'「訓練」期間。僅靠高樣本內表現什麼都證明不了。','guide.outsample_desc':'策略從未見過的「測試」期間，是真實表現的唯一誠實衡量。',
+  'guide.th_pattern':'模式','guide.th_diagnosis':'診斷','guide.th_action':'行動',
+  'guide.wf_p1':'樣本外夏普 ≥ 樣本內夏普 × 0.7','guide.wf_d1':'穩健——策略泛化良好','guide.wf_a1':'可部署',
+  'guide.wf_p2':'樣本外夏普 0.3–0.7× 樣本內','guide.wf_d2':'部分衰退——輕微過度擬合','guide.wf_a2':'需調查',
+  'guide.wf_p3':'樣本外夏普 < 0.3× 或為負值','guide.wf_d3':'過度擬合——表現不具轉移性','guide.wf_a3':'放棄',
+  'guide.wf_p4':'樣本外為正，樣本內為負','guide.wf_d4':'幸運的樣本外——可能是隨機噪音','guide.wf_a4':'放棄',
+  'guide.lookahead':'前瞻偏差','guide.overfitting':'過度擬合','guide.survivorship':'倖存者偏差',
+  'guide.slippage':'滑點與交易成本','guide.regime':'市場情境變化','guide.data_snooping':'數據窺探',
+  'guide.lookahead_desc':'使用未來數據做出過去決策。本系統通過AST檢查驗證此問題。',
+  'guide.overfitting_desc':'不斷調整參數直到策略在歷史數據上完美。前向驗證專門偵測此問題。',
+  'guide.survivorship_desc':'僅對今日仍存在的股票進行測試，忽略了所有已破產或退市的公司。',
+  'guide.slippage_desc':'本系統每筆交易使用0.2%佣金。實際交易還有買賣價差和市場衝擊成本。',
+  'guide.regime_desc':'針對牛市優化的策略在熊市中掙扎。使用策略沙箱在多種市場情境下壓力測試。',
+  'guide.data_snooping_desc':'運行數百個策略變體並選擇最佳的，會虛高表現。使用前向驗證並限制事後選擇。',
+  'guide.qr_metric':'指標','guide.qr_formula':'定義','guide.qr_poor':'差','guide.qr_good':'良好','guide.qr_excellent':'優秀',
+  'guide.qr_tr_def':'(末值-初值)/初值','guide.qr_cagr_def':'年化報酬率','guide.qr_sharpe_def':'報酬/波動率',
+  'guide.qr_calmar_def':'CAGR/最大回撤','guide.qr_dd_def':'最嚴重峰谷跌幅','guide.qr_wr_def':'獲利/總交易',
+  'guide.qr_pf_def':'總獲利/總損失','guide.qr_tc_def':'已平倉交易數','guide.qr_wf_def':'前向驗證比率',
+  'guide.winrate_note':'勝率背景：如果平均盈利是平均損失的3倍，30%勝率對趨勢跟蹤策略是可以的（期望值 = 0.3×3 − 0.7×1 = +0.2）。',
+};
+Object.assign(TRANSLATIONS.en, guideEn);
+Object.assign(TRANSLATIONS['zh-TW'], guideZhTW);
+applyI18n();
+
+// Highlight active TOC link on scroll
+const sections = document.querySelectorAll('.guide-section');
+const tocLinks  = document.querySelectorAll('.toc-link');
+const observer  = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      tocLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#'+e.target.id));
+    }
+  });
+}, { rootMargin: '-20% 0px -60% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

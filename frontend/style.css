@@ -604,3 +604,24 @@ tbody tr:hover td { background: var(--surface2); }
   .options-row { flex-direction: column; }
   .metrics-row .metric-card { min-width: calc(50% - 7px); }
 }
+
+/* ── Language switcher ────────────────────────────────────── */
+.lang-switcher {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: 16px;
+}
+.lang-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+.lang-btn:hover  { border-color: var(--accent); color: var(--text); }
+.lang-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,157,255,.08); }

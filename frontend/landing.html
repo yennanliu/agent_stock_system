@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Quant System — AI-Powered Strategy Generation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #080a11;
+      --surface: #0f1220;
+      --border:  #1e2235;
+      --accent:  #7c9dff;
+      --accent2: #b89bff;
+      --green:   #3de8a0;
+      --red:     #ff6b6b;
+      --yellow:  #fbbf24;
+      --text:    #eef0f8;
+      --muted:   #7b84a3;
+      --font: 'Inter', system-ui, sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); line-height: 1.65; }
+    a    { color: inherit; text-decoration: none; }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: rgba(8,10,17,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 18px; font-weight: 800; }
+    .nav-links { display: flex; gap: 28px; font-size: 14px; }
+    .nav-links a { color: var(--muted); transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; padding: 9px 22px; border-radius: 8px;
+      font-size: 14px; font-weight: 600;
+      transition: opacity .2s, transform .15s;
+    }
+    .nav-cta:hover { opacity: .9; transform: translateY(-1px); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 100px 24px 60px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,157,255,.12) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(184,155,255,.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(124,157,255,.1); border: 1px solid rgba(124,157,255,.25);
+      border-radius: 20px; padding: 6px 16px; font-size: 12px;
+      color: var(--accent); font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
+
+    .hero h1 {
+      font-size: clamp(40px, 6vw, 80px);
+      font-weight: 900;
+      line-height: 1.1;
+      letter-spacing: -.03em;
+      margin-bottom: 24px;
+      max-width: 900px;
+    }
+    .grad { background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--green) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p {
+      font-size: clamp(16px, 2vw, 20px); color: var(--muted); max-width: 600px;
+      margin-bottom: 40px; font-weight: 400;
+    }
+    .hero-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; padding: 14px 32px; border-radius: 10px;
+      font-size: 16px; font-weight: 700; border: none; cursor: pointer;
+      transition: opacity .2s, transform .15s; display: inline-block;
+    }
+    .btn-primary:hover { opacity: .9; transform: translateY(-2px); }
+    .btn-ghost {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted); padding: 14px 32px; border-radius: 10px;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      transition: border-color .2s, color .2s; display: inline-block;
+    }
+    .btn-ghost:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Stats row ── */
+    .stats {
+      display: flex; justify-content: center; gap: 48px; flex-wrap: wrap;
+      padding: 60px 40px; border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-item { text-align: center; }
+    .stat-num  { font-size: 42px; font-weight: 900; letter-spacing: -.03em; }
+    .stat-num.g { color: var(--green); }
+    .stat-num.b { color: var(--accent); }
+    .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Pipeline section ── */
+    .section { padding: 80px 40px; max-width: 1200px; margin: 0 auto; }
+    .section-label {
+      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--accent); margin-bottom: 16px;
+    }
+    .section h2 {
+      font-size: clamp(28px, 4vw, 48px); font-weight: 900;
+      letter-spacing: -.03em; margin-bottom: 16px;
+    }
+    .section > p { font-size: 17px; color: var(--muted); max-width: 560px; margin-bottom: 48px; }
+
+    /* Pipeline cards */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+      position: relative;
+    }
+    .pipeline::after {
+      content: '';
+      position: absolute;
+      top: 48px; left: 60px; right: 60px; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2), var(--green), var(--accent));
+      opacity: .3;
+      pointer-events: none;
+    }
+    .pipe-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px 24px; position: relative;
+      transition: border-color .3s, transform .3s;
+      margin: 0 8px;
+    }
+    .pipe-card:hover { border-color: var(--accent); transform: translateY(-4px); }
+    .pipe-num {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 900; margin-bottom: 16px;
+    }
+    .pipe-card:nth-child(1) .pipe-num { background: rgba(124,157,255,.15); color: var(--accent); }
+    .pipe-card:nth-child(2) .pipe-num { background: rgba(184,155,255,.15); color: var(--accent2); }
+    .pipe-card:nth-child(3) .pipe-num { background: rgba(251,191,36,.15);  color: var(--yellow); }
+    .pipe-card:nth-child(4) .pipe-num { background: rgba(61,232,160,.15);  color: var(--green); }
+    .pipe-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .pipe-card p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* ── Feature grid ── */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .feat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px;
+      transition: border-color .3s, transform .3s;
+    }
+    .feat-card:hover { border-color: var(--border2, #353b5c); transform: translateY(-2px); }
+    .feat-icon { font-size: 28px; margin-bottom: 14px; }
+    .feat-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feat-card p  { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    /* ── Metrics showcase ── */
+    .metrics-showcase {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 32px; margin-top: 48px;
+    }
+    .ms-item { text-align: center; }
+    .ms-val  { font-size: 32px; font-weight: 900; letter-spacing: -.03em; }
+    .ms-label{ font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 500; }
+    .ms-tag  { font-size: 11px; margin-top: 4px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+    .ms-tag.good { background: rgba(61,232,160,.12); color: var(--green); }
+    .ms-tag.warn { background: rgba(251,191,36,.12);  color: var(--yellow); }
+    .ms-tag.bad  { background: rgba(255,107,107,.12); color: var(--red); }
+
+    /* ── CTA section ── */
+    .cta-section {
+      background: linear-gradient(135deg, rgba(124,157,255,.08), rgba(184,155,255,.06));
+      border: 1px solid rgba(124,157,255,.15);
+      border-radius: 24px; padding: 64px 40px;
+      text-align: center; margin: 0 40px 80px;
+    }
+    .cta-section h2 { font-size: 40px; font-weight: 900; letter-spacing: -.03em; margin-bottom: 16px; }
+    .cta-section p  { font-size: 17px; color: var(--muted); margin-bottom: 36px; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 40px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; color: var(--muted); flex-wrap: wrap; gap: 16px;
+    }
+    footer .footer-links { display: flex; gap: 24px; }
+    footer .footer-links a { color: var(--muted); transition: color .2s; }
+    footer .footer-links a:hover { color: var(--text); }
+
+    /* ── Lang switcher ── */
+    .lang-switcher { display:flex; gap:4px; }
+    .lang-btn {
+      background:transparent; border:1px solid var(--border); border-radius:6px;
+      color:var(--muted); font-size:11px; font-weight:600; padding:4px 9px; cursor:pointer;
+      transition:border-color .2s, color .2s;
+    }
+    .lang-btn:hover,.lang-btn.active { border-color:var(--accent); color:var(--accent); }
+
+    @media (max-width:768px) {
+      nav { padding: 0 20px; }
+      .nav-links { display: none; }
+      .section { padding: 60px 20px; }
+      .pipeline::after { display: none; }
+      .cta-section { margin: 0 16px 60px; padding: 48px 24px; }
+      footer { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <span class="nav-logo">⬛ Stock Quant System</span>
+  <div class="nav-links">
+    <a href="/#analyzer" data-i18n="nav.analyzer">Analyzer</a>
+    <a href="/api/playground" data-i18n="nav.playground">Playground</a>
+    <a href="/guide" data-i18n="nav.guide">Eval Guide</a>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="lang-switcher">
+      <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW')">中文</button>
+    </div>
+    <a href="/" class="nav-cta" data-i18n="landing.cta_nav">Launch App →</a>
+  </div>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span>
+    <span data-i18n="landing.badge">AI-Powered · Live System</span>
+  </div>
+  <h1>
+    <span data-i18n="landing.h1a">Trade Smarter with</span><br>
+    <span class="grad" data-i18n="landing.h1b">AI-Generated Strategies</span>
+  </h1>
+  <p data-i18n="landing.subheadline">
+    From raw ticker to backtested strategy in minutes.
+    GPT-4o generates code, validates it, runs a full backtest,
+    and critiques its own results — automatically.
+  </p>
+  <div class="hero-btns">
+    <a href="/" class="btn-primary" data-i18n="landing.cta_primary">Start Analyzing →</a>
+    <a href="/api/playground" class="btn-ghost" data-i18n="landing.cta_secondary">Try Playground</a>
+  </div>
+</section>
+
+<!-- ── Stats ── -->
+<div class="stats">
+  <div class="stat-item"><div class="stat-num g">4</div><div class="stat-label" data-i18n="landing.stat1">AI Agents in Pipeline</div></div>
+  <div class="stat-item"><div class="stat-num b">GPT-4o</div><div class="stat-label" data-i18n="landing.stat2">Strategy Generation</div></div>
+  <div class="stat-item"><div class="stat-num g">3</div><div class="stat-label" data-i18n="landing.stat3">Repair Iterations (max)</div></div>
+  <div class="stat-item"><div class="stat-num b">10+</div><div class="stat-label" data-i18n="landing.stat4">Metrics Computed</div></div>
+  <div class="stat-item"><div class="stat-num g">0</div><div class="stat-label" data-i18n="landing.stat5">External Dependencies for Data</div></div>
+</div>
+
+<!-- ── Pipeline section ── -->
+<div class="section">
+  <div class="section-label" data-i18n="landing.pipeline_label">How It Works</div>
+  <h2 data-i18n="landing.pipeline_h2">4-Stage AI Pipeline</h2>
+  <p data-i18n="landing.pipeline_desc">Each agent hands off to the next. No manual intervention required.</p>
+
+  <div class="pipeline">
+    <div class="pipe-card">
+      <div class="pipe-num">1</div>
+      <h3 data-i18n="landing.p1_title">MarketData Agent</h3>
+      <p data-i18n="landing.p1_desc">Fetches 1–10 years of OHLCV data via yfinance, computes 9 indicators (SMA, EMA, RSI, MACD, Bollinger, ATR…), and produces a market summary.</p>
+    </div>
+    <div class="pipe-card">
+      <div class="pipe-num">2</div>
+      <h3 data-i18n="landing.p2_title">Strategy Agent</h3>
+      <p data-i18n="landing.p2_desc">GPT-4o reads the market summary and generates a complete backtesting.py Strategy class with stop-loss, entry/exit logic, and tunable parameters.</p>
+    </div>
+    <div class="pipe-card">
+      <div class="pipe-num">3</div>
+      <h3 data-i18n="landing.p3_title">Python Master Agent</h3>
+      <p data-i18n="landing.p3_desc">AST-level static analysis + runtime dry-run + GPT-4o repair loop. Catches look-ahead bias, invalid imports, leverage violations, and more.</p>
+    </div>
+    <div class="pipe-card">
+      <div class="pipe-num">4</div>
+      <h3 data-i18n="landing.p4_title">Backtest + Critique Agent</h3>
+      <p data-i18n="landing.p4_desc">Sandboxed execution, 10+ metrics, walk-forward validation, then a self-critique agent generates a revised improved strategy automatically.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Features ── -->
+<div class="section" style="padding-top:0">
+  <div class="section-label" data-i18n="landing.features_label">Features</div>
+  <h2 data-i18n="landing.features_h2">Everything You Need</h2>
+  <p data-i18n="landing.features_desc">Professional-grade tools, no infrastructure required.</p>
+
+  <div class="features">
+    <div class="feat-card">
+      <div class="feat-icon">📈</div>
+      <h3 data-i18n="landing.f1_title">Walk-Forward Validation</h3>
+      <p data-i18n="landing.f1_desc">Automatically splits data 70/30 and reports in-sample vs out-of-sample metrics side by side to detect overfitting.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">⚡</div>
+      <h3 data-i18n="landing.f2_title">Parameter Optimisation</h3>
+      <p data-i18n="landing.f2_desc">Grid-search the strategy's own parameter space using bt.optimize() to find the Sharpe-maximising configuration.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🕯️</div>
+      <h3 data-i18n="landing.f3_title">Candlestick Charts</h3>
+      <p data-i18n="landing.f3_desc">TradingView's lightweight-charts with OHLC candles, buy/sell signal arrows, interactive crosshair, and pan/zoom.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🧪</div>
+      <h3 data-i18n="landing.f4_title">Strategy Playground</h3>
+      <p data-i18n="landing.f4_desc">Upload any .py strategy and run it against synthetic market regimes (bull, bear, sideways, volatile) instantly — no API key needed.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🤖</div>
+      <h3 data-i18n="landing.f5_title">Self-Critique Agent</h3>
+      <p data-i18n="landing.f5_desc">After backtesting, a 5th AI agent analyses the weaknesses and generates an improved revised strategy automatically.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">💾</div>
+      <h3 data-i18n="landing.f6_title">Standalone Runner</h3>
+      <p data-i18n="landing.f6_desc">Every strategy is exported as a self-contained Python script. pip install + python run.py — no system dependencies.</p>
+    </div>
+  </div>
+
+  <!-- Metrics showcase -->
+  <div class="metrics-showcase">
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--green)">+142%</div>
+      <div class="ms-label" data-i18n="landing.ms1">Total Return</div>
+      <div class="ms-tag good" data-i18n="landing.ms1_tag">Example</div>
+    </div>
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--accent)">2.4</div>
+      <div class="ms-label" data-i18n="landing.ms2">Sharpe Ratio</div>
+      <div class="ms-tag good" data-i18n="landing.ms2_tag">Excellent</div>
+    </div>
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--yellow)">−18%</div>
+      <div class="ms-label" data-i18n="landing.ms3">Max Drawdown</div>
+      <div class="ms-tag warn" data-i18n="landing.ms3_tag">Acceptable</div>
+    </div>
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--green)">63%</div>
+      <div class="ms-label" data-i18n="landing.ms4">Win Rate</div>
+      <div class="ms-tag good" data-i18n="landing.ms4_tag">Good</div>
+    </div>
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--accent)">1.8</div>
+      <div class="ms-label" data-i18n="landing.ms5">Profit Factor</div>
+      <div class="ms-tag good" data-i18n="landing.ms5_tag">Strong</div>
+    </div>
+    <div class="ms-item">
+      <div class="ms-val" style="color:var(--accent2)">+0.7%</div>
+      <div class="ms-label" data-i18n="landing.ms6">Out-of-Sample Edge</div>
+      <div class="ms-tag good" data-i18n="landing.ms6_tag">Validated</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CTA ── -->
+<div class="cta-section">
+  <h2><span class="grad" data-i18n="landing.cta_h2">Ready to quantify your edge?</span></h2>
+  <p data-i18n="landing.cta_desc">Enter any stock ticker and let the AI pipeline generate, validate, and backtest a strategy for you in minutes.</p>
+  <a href="/" class="btn-primary" style="font-size:18px;padding:16px 40px" data-i18n="landing.cta_btn">Launch Analyzer →</a>
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <span>⬛ Stock Quant System · <span data-i18n="landing.footer_built">Built with FastAPI, CrewAI & GPT-4o</span></span>
+  <div class="footer-links">
+    <a href="/" data-i18n="nav.analyzer">Analyzer</a>
+    <a href="/api/playground" data-i18n="nav.playground">Playground</a>
+    <a href="/guide" data-i18n="nav.guide">Eval Guide</a>
+  </div>
+</footer>
+
+<script src="/static/i18n.js"></script>
+<script>
+// Extra landing-specific translations
+Object.assign(TRANSLATIONS.en, {
+  'landing.badge':         'AI-Powered · Live System',
+  'landing.h1a':           'Trade Smarter with',
+  'landing.h1b':           'AI-Generated Strategies',
+  'landing.subheadline':   'From raw ticker to backtested strategy in minutes. GPT-4o generates code, validates it, runs a full backtest, and critiques its own results — automatically.',
+  'landing.cta_nav':       'Launch App →',
+  'landing.cta_primary':   'Start Analyzing →',
+  'landing.cta_secondary': 'Try Playground',
+  'landing.stat1': 'AI Agents in Pipeline',   'landing.stat2': 'Strategy Engine',
+  'landing.stat3': 'Max Repair Iterations',   'landing.stat4': 'Metrics Computed',
+  'landing.stat5': 'Extra Deps for Playground Data',
+  'landing.pipeline_label':'How It Works',    'landing.pipeline_h2': '4-Stage AI Pipeline',
+  'landing.pipeline_desc': 'Each agent hands off to the next. No manual intervention required.',
+  'landing.p1_title':'MarketData Agent',      'landing.p1_desc':'Fetches 1–10 years of OHLCV data, computes 9 technical indicators, produces a market summary.',
+  'landing.p2_title':'Strategy Agent',        'landing.p2_desc':'GPT-4o generates a complete Strategy class with stop-loss, entry/exit logic, and tunable parameters.',
+  'landing.p3_title':'Python Master Agent',   'landing.p3_desc':'AST analysis + dry-run + GPT-4o repair loop catches look-ahead bias, invalid patterns, and more.',
+  'landing.p4_title':'Backtest + Critique',   'landing.p4_desc':'Sandboxed execution, 10+ metrics, walk-forward validation, then a self-critique agent improves the strategy.',
+  'landing.features_label':'Features',        'landing.features_h2':'Everything You Need',
+  'landing.features_desc':'Professional-grade tools, no infrastructure required.',
+  'landing.f1_title':'Walk-Forward Validation','landing.f1_desc':'Splits data 70/30 and reports in-sample vs out-of-sample metrics to detect overfitting.',
+  'landing.f2_title':'Parameter Optimisation', 'landing.f2_desc':'Grid-search the strategy\'s own parameters to find the Sharpe-maximising configuration.',
+  'landing.f3_title':'Candlestick Charts',     'landing.f3_desc':'TradingView lightweight-charts with OHLC candles, buy/sell signal arrows, interactive crosshair.',
+  'landing.f4_title':'Strategy Playground',    'landing.f4_desc':'Upload any .py strategy and run it against synthetic market regimes instantly.',
+  'landing.f5_title':'Self-Critique Agent',    'landing.f5_desc':'A 5th AI agent analyses weaknesses and generates an improved revised strategy.',
+  'landing.f6_title':'Standalone Runner',      'landing.f6_desc':'Every strategy exports as a self-contained Python script — pip install + python run.py.',
+  'landing.ms1':'Total Return',  'landing.ms1_tag':'Example',
+  'landing.ms2':'Sharpe Ratio',  'landing.ms2_tag':'Excellent',
+  'landing.ms3':'Max Drawdown',  'landing.ms3_tag':'Acceptable',
+  'landing.ms4':'Win Rate',      'landing.ms4_tag':'Good',
+  'landing.ms5':'Profit Factor', 'landing.ms5_tag':'Strong',
+  'landing.ms6':'Out-of-Sample', 'landing.ms6_tag':'Validated',
+  'landing.cta_h2':'Ready to quantify your edge?',
+  'landing.cta_desc':'Enter any stock ticker and let the AI pipeline generate, validate, and backtest a strategy for you in minutes.',
+  'landing.cta_btn':'Launch Analyzer →',
+  'landing.footer_built':'Built with FastAPI, CrewAI & GPT-4o',
+});
+Object.assign(TRANSLATIONS['zh-TW'], {
+  'landing.badge':         'AI 驅動 · 即時系統',
+  'landing.h1a':           '以 AI 策略',
+  'landing.h1b':           '智慧交易',
+  'landing.subheadline':   '從股票代號到回測策略，只需數分鐘。GPT-4o 自動生成程式碼、驗證邏輯、執行回測並自我檢討改進。',
+  'landing.cta_nav':       '啟動應用程式 →',
+  'landing.cta_primary':   '開始分析 →',
+  'landing.cta_secondary': '試用沙箱',
+  'landing.stat1':'AI 智能代理','landing.stat2':'策略生成引擎',
+  'landing.stat3':'最大修復迭代次數','landing.stat4':'計算指標數量',
+  'landing.stat5':'沙箱測試所需額外依賴',
+  'landing.pipeline_label':'運作原理','landing.pipeline_h2':'四階段 AI 流水線',
+  'landing.pipeline_desc':'每個代理自動交接，無需人工干預。',
+  'landing.p1_title':'市場數據代理','landing.p1_desc':'透過 yfinance 獲取 1–10 年 OHLCV 數據，計算 9 項技術指標，生成市場摘要。',
+  'landing.p2_title':'策略生成代理','landing.p2_desc':'GPT-4o 解讀市場摘要，生成完整的 backtesting.py 策略類別，包含止損、進出場邏輯及可調參數。',
+  'landing.p3_title':'Python 大師代理','landing.p3_desc':'AST 靜態分析 + 執行測試 + GPT-4o 修復循環，捕捉前瞻偏差、非法導入、超槓桿等問題。',
+  'landing.p4_title':'回測與自我批評','landing.p4_desc':'沙箱執行、10+ 指標計算、前向驗證，自我批評代理再生成改進版策略。',
+  'landing.features_label':'功能特點','landing.features_h2':'一站式工具箱',
+  'landing.features_desc':'專業級量化工具，無需額外基礎設施。',
+  'landing.f1_title':'前向驗證','landing.f1_desc':'自動將數據分割為 70/30，對比樣本內外指標，有效偵測過度擬合。',
+  'landing.f2_title':'參數優化','landing.f2_desc':'對策略參數空間進行網格搜索，找出夏普比率最優的參數組合。',
+  'landing.f3_title':'K 線圖表','landing.f3_desc':'TradingView 輕量圖表，含 OHLC 蠟燭圖、買賣訊號箭頭及互動式十字線。',
+  'landing.f4_title':'策略沙箱','landing.f4_desc':'上傳任意 .py 策略，即時在合成市場情境（多頭/空頭/盤整/高波動）下測試，無需 API 金鑰。',
+  'landing.f5_title':'自我批評代理','landing.f5_desc':'第 5 個 AI 代理分析策略弱點並自動生成改進版本。',
+  'landing.f6_title':'獨立執行腳本','landing.f6_desc':'每個策略都導出為獨立 Python 腳本，pip install + python run.py 即可運行。',
+  'landing.ms1':'總回報','landing.ms1_tag':'示例',
+  'landing.ms2':'夏普比率','landing.ms2_tag':'優秀',
+  'landing.ms3':'最大回撤','landing.ms3_tag':'可接受',
+  'landing.ms4':'勝率','landing.ms4_tag':'良好',
+  'landing.ms5':'獲利因子','landing.ms5_tag':'強勁',
+  'landing.ms6':'樣本外優勢','landing.ms6_tag':'已驗證',
+  'landing.cta_h2':'準備好量化您的交易優勢了嗎？',
+  'landing.cta_desc':'輸入任意股票代號，讓 AI 流水線在數分鐘內為您生成、驗證並回測策略。',
+  'landing.cta_btn':'啟動分析器 →',
+  'landing.footer_built':'以 FastAPI、CrewAI 與 GPT-4o 構建',
+});
+applyI18n();
+</script>
+</body>
+</html>

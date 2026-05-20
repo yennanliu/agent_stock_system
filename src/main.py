@@ -473,5 +473,15 @@ async def root():
     return FileResponse("frontend/index.html")
 
 
+@app.get("/landing")
+async def landing():
+    return FileResponse("frontend/landing.html")
+
+
+@app.get("/guide")
+async def guide():
+    return FileResponse("frontend/guide.html")
+
+
 # ── Static assets ─────────────────────────────────────────────────────────────
 app.mount("/static", StaticFiles(directory="frontend"), name="static")

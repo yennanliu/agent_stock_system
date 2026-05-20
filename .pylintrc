@@ -1,0 +1,44 @@
+[MASTER]
+jobs=1
+extension-pkg-allow-list=
+
+[MESSAGES CONTROL]
+disable=
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-instance-attributes,
+    too-many-lines,
+    invalid-name,
+    broad-exception-caught,
+    broad-exception-raised,
+    logging-fstring-interpolation,
+    import-outside-toplevel,
+    fixme,
+    duplicate-code,
+    wrong-import-order,
+    consider-using-f-string,
+    unspecified-encoding,
+    redefined-outer-name,
+    unnecessary-pass,
+    global-statement
+
+[FORMAT]
+max-line-length=120
+
+[DESIGN]
+max-args=12
+max-locals=20
+max-returns=8
+
+[SIMILARITIES]
+min-similarity-lines=10
+
+[TYPECHECK]
+ignored-modules=backtesting,crewai,yfinance
+ignored-classes=Backtest,Strategy,Crew,Agent,Task

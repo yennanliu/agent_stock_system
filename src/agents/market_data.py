@@ -1,4 +1,3 @@
-import json
 import pandas as pd
 from crewai import Agent, Task
 from crewai.tools import tool

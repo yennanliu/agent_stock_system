@@ -12,9 +12,14 @@
 <header>
   <div class="header-inner">
     <span class="logo">⬛ Stock Quant System</span>
-    <span class="tagline">AI-powered quantitative strategy generation &amp; backtesting</span>
-    <nav style="margin-left:auto;font-size:13px">
-      <a href="/api/playground" style="color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">🧪 Playground</a>
+    <span class="tagline" data-i18n="tagline.main">AI-powered quantitative strategy generation &amp; backtesting</span>
+    <nav style="margin-left:auto;font-size:13px;display:flex;align-items:center;gap:10px">
+      <a href="/api/playground" style="color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" data-i18n="nav.playground">🧪 Playground</a>
+      <a href="/guide" style="color:var(--text-muted);text-decoration:none;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);transition:border-color .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" data-i18n="nav.guide">📖 Eval Guide</a>
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW')">中文</button>
+      </div>
     </nav>
   </div>
 </header>
@@ -37,12 +42,12 @@
     <!-- Search -->
     <section id="search-section">
       <div class="search-box">
-        <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)" autocomplete="off" />
-        <button id="analyzeBtn">Analyze</button>
+        <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)" autocomplete="off" data-i18n="search.placeholder" data-i18n-attr="placeholder" />
+        <button id="analyzeBtn" data-i18n="search.analyze_btn">Analyze</button>
       </div>
       <div class="options-row">
         <div class="option-group">
-          <label for="strategyTypeSelect">Strategy Type</label>
+          <label for="strategyTypeSelect" data-i18n="search.strategy_type">Strategy Type</label>
           <select id="strategyTypeSelect">
             <option value="auto">Auto (AI decides)</option>
             <option value="trend_following">Trend Following</option>
@@ -52,7 +57,7 @@
           </select>
         </div>
         <div class="option-group">
-          <label for="indicatorsSelect">Indicators</label>
+          <label for="indicatorsSelect" data-i18n="search.indicators">Indicators</label>
           <select id="indicatorsSelect">
             <option value="auto">Auto (AI decides)</option>
             <option value="sma">SMA Crossover</option>
@@ -98,7 +103,7 @@
           <a id="downloadBtn" class="icon-link" title="Download strategy class .py">⬇ Strategy</a>
           <a id="runnerBtn" class="icon-link" title="Download standalone runner script">⬇ Runner</a>
           <button id="optimizeBtn" class="icon-btn" title="Grid-search best parameters">⚡ Optimize</button>
-          <button id="runBtn" class="run-btn">▶ Run Again</button>
+          <button id="runBtn" class="run-btn" data-i18n="strategy.run_again">▶ Run Again</button>
         </div>
       </div>
       <pre><code id="sourceCode" class="language-python"></code></pre>
@@ -107,7 +112,7 @@
     <!-- Backtest panel -->
     <section id="backtest-panel" hidden>
       <div class="panel-header">
-        <h2>Backtest Results</h2>
+        <h2 data-i18n="backtest.title">Backtest Results</h2>
         <div class="run-actions">
           <span id="runIdBadge" class="run-id-badge"></span>
           <a id="runSourceBtn" class="icon-link" title="Download strategy code for this run" hidden>⬇ Run Code</a>
@@ -152,7 +157,7 @@
         </div>
       </div>
 
-      <h3>Trade Log</h3>
+      <h3 data-i18n="backtest.trade_log">Trade Log</h3>
       <div class="table-wrap">
         <table id="tradeLog">
           <thead>
@@ -166,7 +171,7 @@
         </table>
       </div>
 
-      <h3>Analysis</h3>
+      <h3 data-i18n="backtest.analysis">Analysis</h3>
       <div id="narrative" class="narrative"></div>
     </section>
   </main>
@@ -177,6 +182,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="/static/i18n.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

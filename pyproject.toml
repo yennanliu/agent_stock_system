@@ -23,5 +23,6 @@ dev = "uvicorn src.main:app --reload --reload-dir src --reload-dir frontend --ho
 
 [dependency-groups]
 dev = [
+    "pylint>=4.0.5",
     "pytest>=9.0.3",
 ]

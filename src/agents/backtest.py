@@ -32,7 +32,7 @@ def generate_explanation(strategy_name: str, description: str, metrics: dict) ->
 
 
 @tool("run_and_explain_backtest")
-def run_and_explain_tool(source_code: str, ticker: str, strategy_description: str) -> str:
+def run_and_explain_tool(source_code: str, ticker: str, strategy_description: str = "") -> str:  # noqa: unused-arg
     """Run a backtest for a strategy and return metrics summary."""
     from src.agents.market_data import get_cached_df
     from src.tools.fetch_data import fetch_ohlcv
@@ -69,7 +69,7 @@ backtest_agent = Agent(
 )
 
 
-def build_backtest_task(ticker: str, source_code: str, strategy_description: str) -> Task:
+def build_backtest_task(ticker: str, source_code: str, strategy_description: str = "") -> Task:  # noqa: unused-arg
     return Task(
         description=(
             f"Run a backtest for the following strategy on {ticker}. "
