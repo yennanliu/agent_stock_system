@@ -56,7 +56,7 @@ async def analyze(
     return EventSourceResponse(stream())
 
 
-@app.post("/api/run/{strategy_id}")
+@app.get("/api/run/{strategy_id}")
 async def rerun(strategy_id: int, period: str = Query(DATA_PERIOD)):
     """Re-run a saved strategy with fresh market data (skips generation)."""
     from src.crew import run_backtest_pipeline
