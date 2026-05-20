@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
@@ -41,6 +42,7 @@ async def analyze(
     ticker: str = Query(..., description="Stock ticker, e.g. NVDA"),
     strategy_type: str = Query("auto", description="Strategy style: trend_following, mean_reversion, momentum, breakout, auto"),
     indicators: str = Query("auto", description="Indicators to use: sma, ema, rsi, macd, bollinger, atr, combined, auto"),
+    period: str = Query(DATA_PERIOD, description="Data period: 1y, 2y, 5y, 10y"),
 ):
     """Full pipeline: data → strategy → review → backtest, streamed via SSE."""
     from src.crew import run_analyze_pipeline
@@ -50,6 +52,7 @@ async def analyze(
             ticker.upper(),
             strategy_type=strategy_type,
             indicators=indicators,
+            period=period,
         ):
             yield event
 
@@ -186,6 +189,47 @@ async def all_runs():
             d["metrics"] = json.loads(d["metrics"])
         result.append(d)
     return result
+
+
+@app.get("/api/strategies/{strategy_id}/run-with-params")
+async def run_with_params(
+    strategy_id: int,
+    params: str = Query("{}", description="JSON object of param overrides, e.g. {\"n_fast\":10}"),
+    period: str = Query(DATA_PERIOD),
+):
+    """Re-run a strategy with patched parameter values (no LLM call)."""
+    from src.crew import run_backtest_pipeline
+
+    strategy = get_strategy(strategy_id)
+    if strategy is None:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    try:
+        param_overrides = json.loads(params)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="'params' must be a valid JSON object")
+
+    # Patch numeric parameter assignments in the source code
+    patched_code = strategy["source_code"]
+    for name, value in param_overrides.items():
+        if isinstance(value, (int, float)):
+            patched_code = re.sub(
+                rf"^(\s*{re.escape(name)}\s*=\s*)[\d.]+",
+                lambda m, v=value: f"{m.group(1)}{v}",
+                patched_code,
+                flags=re.MULTILINE,
+            )
+
+    patched_strategy = dict(strategy)
+    patched_strategy["source_code"] = patched_code
+    # Update parameters dict for display
+    patched_strategy["parameters"] = {**strategy.get("parameters", {}), **param_overrides}
+
+    async def stream():
+        async for event in run_backtest_pipeline(patched_strategy, period):
+            yield event
+
+    return EventSourceResponse(stream())
 
 
 @app.get("/health")

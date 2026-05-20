@@ -10,6 +10,7 @@ from src.agents.strategy import (
     strategy_agent,
     build_strategy_task,
     parse_strategy_response,
+    generate_strategy_direct,
     extract_strategy_name,
     extract_parameters,
 )
@@ -32,15 +33,16 @@ async def run_analyze_pipeline(
     ticker: str,
     strategy_type: str = "auto",
     indicators: str = "auto",
+    period: str = DATA_PERIOD,
 ) -> AsyncGenerator[dict, None]:
     """Full pipeline: data → strategy → review → backtest, yielding SSE events."""
 
     # ── Stage 1: Market Data ──────────────────────────────────────────────────
-    yield _sse("market_data", f"Fetching market data for {ticker}…")
+    yield _sse("market_data", f"Fetching market data for {ticker} ({period})…")
     await asyncio.sleep(0)
     try:
         df = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: compute_indicators(fetch_ohlcv(ticker, DATA_PERIOD))
+            None, lambda: compute_indicators(fetch_ohlcv(ticker, period))
         )
         summary = market_summary(df)
     except ValueError as e:
@@ -50,11 +52,9 @@ async def run_analyze_pipeline(
     yield _sse("market_data", f"Market data ready. {len(df)} trading days loaded.", summary=summary)
     await asyncio.sleep(0)
 
-    # ── Stage 2: Strategy Generation ─────────────────────────────────────────
+    # ── Stage 2: Strategy Generation (structured output, no regex parsing) ───
     yield _sse("strategy", "Generating quantitative strategy…")
     await asyncio.sleep(0)
-
-    task = build_strategy_task(ticker, summary, strategy_type=strategy_type, indicators=indicators)
 
     source_code, explanation = None, ""
     last_err = None
@@ -62,16 +62,15 @@ async def run_analyze_pipeline(
         if attempt > 1:
             yield _sse("strategy", f"Retrying strategy generation (attempt {attempt}/3)…")
             await asyncio.sleep(0)
-        crew = Crew(
-            agents=[strategy_agent],
-            tasks=[task],
-            process=Process.sequential,
-            verbose=False,
-        )
         try:
-            result = await asyncio.get_event_loop().run_in_executor(None, crew.kickoff)
-            raw_output = str(result)
-            source_code, explanation = parse_strategy_response(raw_output)
+            source_code, explanation = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: generate_strategy_direct(
+                    ticker, summary,
+                    strategy_type=strategy_type,
+                    indicators=indicators,
+                ),
+            )
             break
         except Exception as e:
             last_err = e
@@ -158,6 +157,7 @@ async def run_analyze_pipeline(
         raw_df=df,
         price_series=bt_result["price_series"],
         signals=bt_result["signals"],
+        walkforward=bt_result.get("walkforward"),
     )
 
     m = bt_result["metrics"]
@@ -221,6 +221,7 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         raw_df=df,
         price_series=bt_result["price_series"],
         signals=bt_result["signals"],
+        walkforward=bt_result.get("walkforward"),
     )
 
     m = bt_result["metrics"]

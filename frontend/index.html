@@ -61,6 +61,15 @@
             <option value="combined">Combined (multiple)</option>
           </select>
         </div>
+        <div class="option-group">
+          <label for="periodSelect">History</label>
+          <select id="periodSelect">
+            <option value="1y">1 Year</option>
+            <option value="2y" selected>2 Years</option>
+            <option value="5y">5 Years</option>
+            <option value="10y">10 Years</option>
+          </select>
+        </div>
       </div>
       <div id="status-log"></div>
     </section>
@@ -76,6 +85,10 @@
       </div>
       <p id="strategyExplanation"></p>
       <table id="paramTable" class="param-table"></table>
+      <div class="param-actions" id="paramActions" hidden>
+        <button id="runWithParamsBtn" class="run-btn">▶ Re-run with these params</button>
+        <button id="resetParamsBtn" class="icon-btn">↺ Reset</button>
+      </div>
       <div class="code-header">
         <span>Strategy Source Code</span>
         <div class="code-actions">
@@ -97,6 +110,10 @@
         </div>
       </div>
       <div id="metricsRow" class="metrics-row"></div>
+      <div id="walkforwardCard" class="walkforward-card" hidden>
+        <h4>Walk-Forward Validation <span class="wf-badge">In-sample 70% / Out-of-sample 30%</span></h4>
+        <div id="walkforwardTable"></div>
+      </div>
 
       <!-- Price chart with animated buy/sell signals -->
       <div class="chart-card full-width" id="signalChartCard" hidden>

@@ -165,12 +165,30 @@ def run_backtest(
         if t["exit_date"]:
             signals.append({"date": _date_str(t["exit_date"]),  "type": "sell", "price": t["exit_price"]})
 
+    # Walk-forward: in-sample (first 70%) vs out-of-sample (last 30%)
+    walkforward = {}
+    split = int(len(df) * 0.70)
+    df_in  = df.iloc[:split]
+    df_out = df.iloc[split:]
+    if len(df_in) > 50 and len(df_out) > 20:
+        try:
+            wf_in  = Backtest(df_in,  StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
+            wf_out = Backtest(df_out, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
+            walkforward = {
+                "split_date":  str(df.index[split].date()),
+                "in_sample":   _extract_metrics(wf_in.run()),
+                "out_sample":  _extract_metrics(wf_out.run()),
+            }
+        except Exception:
+            pass  # walk-forward is best-effort; don't block the full backtest result
+
     return {
         "metrics": _extract_metrics(stats),
         "equity_curve": _equity_series(stats),
         "trade_log": trade_log,
         "price_series": price_series,
         "signals": signals,
+        "walkforward": walkforward,
         "start_date": str(df.index[0].date()),
         "end_date": str(df.index[-1].date()),
     }

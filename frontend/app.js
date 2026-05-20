@@ -6,6 +6,7 @@ let currentBacktestId = null;
 let activeHistoryId   = null;
 let equityChart = null, drawdownChart = null, pnlChart = null, signalChart = null;
 let _signalAnimData = null;  // cached for replay
+let _originalParams = {};   // original params for reset
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -13,6 +14,7 @@ const tickerInput        = $('tickerInput');
 const analyzeBtn         = $('analyzeBtn');
 const strategyTypeSelect = $('strategyTypeSelect');
 const indicatorsSelect   = $('indicatorsSelect');
+const periodSelect       = $('periodSelect');
 const statusLog          = $('status-log');
 const strategyPanel      = $('strategy-panel');
 const backtestPanel      = $('backtest-panel');
@@ -24,6 +26,9 @@ const runDataBtn         = $('runDataBtn');
 const replayBtn          = $('replayBtn');
 const historyList        = $('historyList');
 const refreshHistBtn     = $('refreshHistoryBtn');
+const runWithParamsBtn   = $('runWithParamsBtn');
+const resetParamsBtn     = $('resetParamsBtn');
+const paramActions       = $('paramActions');
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshHistoryList();
@@ -37,6 +42,8 @@ tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeBtn
 runBtn.addEventListener('click', () => rerunStrategy());
 refreshHistBtn.addEventListener('click', refreshHistoryList);
 replayBtn.addEventListener('click', () => { if (_signalAnimData) animateSignalChart(_signalAnimData); });
+runWithParamsBtn.addEventListener('click', () => rerunWithParams());
+resetParamsBtn.addEventListener('click', () => resetParams());
 
 // ── Analysis pipeline ─────────────────────────────────────────────────────────
 function startAnalysis(ticker) {
@@ -47,8 +54,9 @@ function startAnalysis(ticker) {
 
   const strategyType = strategyTypeSelect.value;
   const indicators   = indicatorsSelect.value;
+  const period       = periodSelect.value;
   const es = new EventSource(
-    `/api/analyze?ticker=${ticker}&strategy_type=${strategyType}&indicators=${indicators}`
+    `/api/analyze?ticker=${ticker}&strategy_type=${strategyType}&indicators=${indicators}&period=${period}`
   );
   es.onmessage = async e => {
     const data = JSON.parse(e.data);
@@ -88,6 +96,43 @@ async function rerunStrategy() {
     if (data.stage === 'error') { es.close(); runBtn.disabled = false; }
   };
   es.onerror = () => { es.close(); runBtn.disabled = false; };
+}
+
+function rerunWithParams() {
+  if (!currentStrategyId) return;
+  const overrides = {};
+  document.querySelectorAll('.param-input').forEach(input => {
+    const name = input.dataset.param;
+    const raw  = input.value.trim();
+    if (raw !== '') overrides[name] = raw.includes('.') ? parseFloat(raw) : parseInt(raw, 10);
+  });
+  const period = periodSelect.value;
+  runWithParamsBtn.disabled = true;
+  clearStatusLog();
+
+  const paramsJson = encodeURIComponent(JSON.stringify(overrides));
+  const es = new EventSource(
+    `/api/strategies/${currentStrategyId}/run-with-params?params=${paramsJson}&period=${period}`
+  );
+  es.onmessage = async e => {
+    const data = JSON.parse(e.data);
+    appendLog(data.stage, data.message, data.stage === 'error');
+    if (data.stage === 'complete') {
+      es.close(); runWithParamsBtn.disabled = false;
+      await loadBacktest(data.backtest_id);
+      setActiveHistory(data.backtest_id);
+      refreshHistoryList();
+    }
+    if (data.stage === 'error') { es.close(); runWithParamsBtn.disabled = false; }
+  };
+  es.onerror = () => { es.close(); runWithParamsBtn.disabled = false; };
+}
+
+function resetParams() {
+  document.querySelectorAll('.param-input').forEach(input => {
+    const orig = _originalParams[input.dataset.param];
+    if (orig !== undefined) input.value = orig;
+  });
 }
 
 // ── History sidebar ───────────────────────────────────────────────────────────
@@ -162,17 +207,21 @@ async function loadStrategy(id) {
     badge.innerHTML = '';
   }
 
-  // Parameters
+  // Parameters (editable)
   const params = data.parameters || {};
+  _originalParams = { ...params };
   const paramTable = $('paramTable');
   if (Object.keys(params).length) {
     paramTable.innerHTML =
-      '<thead><tr><th>Parameter</th><th>Default</th></tr></thead><tbody>' +
+      '<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>' +
       Object.entries(params).map(([k, v]) =>
-        `<tr><td>${escHtml(k)}</td><td>${escHtml(String(v))}</td></tr>`
+        `<tr><td>${escHtml(k)}</td><td>` +
+        `<input class="param-input" data-param="${escHtml(k)}" type="number" value="${escHtml(String(v))}" step="any" /></td></tr>`
       ).join('') + '</tbody>';
+    paramActions.hidden = false;
   } else {
     paramTable.innerHTML = '';
+    paramActions.hidden = true;
   }
 
   // Source code
@@ -188,6 +237,7 @@ async function loadBacktest(id) {
   currentBacktestId = id;
   const data = await fetch(`/api/backtest/${id}`).then(r => r.json());
   renderMetrics(data.metrics);
+  renderWalkforward(data.walkforward);
   renderEquityCurve(data.equity_curve, data.metrics.buy_hold_return_pct);
   renderDrawdown(data.equity_curve);
   renderPnlChart(data.trade_log);
@@ -340,6 +390,49 @@ function renderMetrics(m) {
       <div class="value ${c.neg ? 'neg' : c.pos ? 'pos' : 'neutral'}">${c.value}</div>
       ${c.sub ? `<div class="sub">${c.sub}</div>` : ''}
     </div>`).join('');
+}
+
+// ── Walk-forward table ────────────────────────────────────────────────────────
+function renderWalkforward(wf) {
+  const card = $('walkforwardCard');
+  if (!wf || !wf.in_sample) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const ins  = wf.in_sample;
+  const outs = wf.out_sample;
+
+  const rows = [
+    ['Total Return %',    ins.total_return_pct,   outs.total_return_pct,   true],
+    ['CAGR %',           ins.cagr_pct,            outs.cagr_pct,            true],
+    ['Sharpe',           ins.sharpe,               outs.sharpe,               true],
+    ['Max Drawdown %',   ins.max_drawdown_pct,     outs.max_drawdown_pct,     false],
+    ['Win Rate %',       ins.win_rate_pct,          outs.win_rate_pct,          true],
+    ['# Trades',         ins.num_trades,            outs.num_trades,            null],
+  ];
+
+  $('walkforwardTable').innerHTML = `
+    <table class="wf-table">
+      <thead><tr>
+        <th>Metric</th>
+        <th>In-sample<br><small>first 70%</small></th>
+        <th>Out-of-sample<br><small>last 30%</small></th>
+        <th>Δ</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(([label, iv, ov, higherGood]) => {
+          const delta = (iv !== undefined && ov !== undefined) ? (ov - iv) : null;
+          const deltaStr = delta !== null ? `${delta >= 0 ? '+' : ''}${fmt(delta)}` : '—';
+          const deltaCls = delta === null || higherGood === null ? '' : (delta >= 0 === higherGood ? 'td-pos' : 'td-neg');
+          return `<tr>
+            <td>${label}</td>
+            <td>${fmt(iv)}</td>
+            <td>${fmt(ov)}</td>
+            <td class="${deltaCls}">${deltaStr}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="wf-split-note">Split date: ${wf.split_date || '—'}</div>`;
 }
 
 // ── Charts ────────────────────────────────────────────────────────────────────

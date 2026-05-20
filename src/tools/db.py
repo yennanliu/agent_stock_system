@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
     raw_data_path   TEXT,
     price_series    TEXT,
     signals         TEXT,
+    walkforward     TEXT,
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """
@@ -61,6 +62,7 @@ ALTER TABLE backtest_runs ADD COLUMN source_code TEXT;
 ALTER TABLE backtest_runs ADD COLUMN raw_data_path TEXT;
 ALTER TABLE backtest_runs ADD COLUMN price_series TEXT;
 ALTER TABLE backtest_runs ADD COLUMN signals TEXT;
+ALTER TABLE backtest_runs ADD COLUMN walkforward TEXT;
 """
 
 RAW_DATA_DIR = Path("data/raw")
@@ -180,6 +182,7 @@ def save_backtest_run(
     raw_df=None,           # optional pd.DataFrame of OHLCV + indicators
     price_series: list | None = None,
     signals: list | None = None,
+    walkforward: dict | None = None,
 ) -> int:
     # Reserve a row ID first (needed for file paths)
     with _conn() as con:
@@ -187,8 +190,8 @@ def save_backtest_run(
             """INSERT INTO backtest_runs
                (strategy_id, ticker, start_date, end_date, initial_capital,
                 metrics, equity_curve, trade_log, explanation,
-                source_code, raw_data_path, price_series, signals)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                source_code, raw_data_path, price_series, signals, walkforward)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 strategy_id, ticker, start_date, end_date, initial_capital,
                 json.dumps(metrics), json.dumps(equity_curve),
@@ -196,6 +199,7 @@ def save_backtest_run(
                 source_code, None,
                 json.dumps(price_series or []),
                 json.dumps(signals or []),
+                json.dumps(walkforward or {}),
             ),
         )
         run_id = cur.lastrowid
@@ -251,7 +255,7 @@ def get_backtest(run_id: int) -> dict | None:
     if row is None:
         return None
     d = dict(row)
-    for key in ("metrics", "equity_curve", "trade_log", "price_series", "signals"):
+    for key in ("metrics", "equity_curve", "trade_log", "price_series", "signals", "walkforward"):
         if d.get(key):
             d[key] = json.loads(d[key])
     return d

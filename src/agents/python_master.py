@@ -1,12 +1,40 @@
+import logging
 import re
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 from crewai import Agent, Task
 from crewai.tools import tool
 from openai import OpenAI
 
 from src.tools.code_validator import run_all_checks
 from src.config import OPENAI_API_KEY, MAX_REVIEW_ITERATIONS
+
+log = logging.getLogger(__name__)
+
+
+def _dry_run(source_code: str) -> list[str]:
+    """Execute strategy on a tiny 20-row synthetic DataFrame to catch runtime errors."""
+    n = 25
+    idx = pd.date_range("2022-01-03", periods=n, freq="B")
+    prices = np.linspace(100.0, 120.0, n)
+    df = pd.DataFrame(
+        {
+            "Open":   prices * 0.998,
+            "High":   prices * 1.005,
+            "Low":    prices * 0.993,
+            "Close":  prices,
+            "Volume": np.full(n, 1_000_000, dtype=float),
+        },
+        index=idx,
+    )
+    try:
+        from src.tools.backtest_runner import run_backtest
+        run_backtest(source_code, df, initial_cash=10_000)
+        return []
+    except Exception as e:
+        return [f"Dry-run execution error (fix this before the real backtest): {e}"]
 
 _REVIEW_PROMPT = (Path(__file__).parent.parent / "prompts" / "code_review.txt").read_text()
 _client = OpenAI(api_key=OPENAI_API_KEY)
@@ -71,15 +99,20 @@ def review_and_repair(source_code: str) -> dict:
     for iteration in range(MAX_REVIEW_ITERATIONS):
         issues = run_all_checks(source_code)
         if not issues:
-            confidence = max(95 - iteration * 5, 80)
-            return {
-                "approved": True,
-                "source_code": source_code,
-                "confidence": confidence,
-                "issues_found": all_issues,
-                "fixes_applied": all_fixes,
-                "iterations": iteration,
-            }
+            # Static checks pass — do a runtime dry-run
+            dry_issues = _dry_run(source_code)
+            if not dry_issues:
+                confidence = max(95 - iteration * 5, 80)
+                return {
+                    "approved": True,
+                    "source_code": source_code,
+                    "confidence": confidence,
+                    "issues_found": all_issues,
+                    "fixes_applied": all_fixes,
+                    "iterations": iteration,
+                }
+            issues = dry_issues
+            log.info("Dry-run found issues at iteration %d: %s", iteration, dry_issues)
 
         all_issues.extend(issues)
 
@@ -107,7 +140,7 @@ def review_and_repair(source_code: str) -> dict:
         all_fixes.extend(fixes)
 
     # Final check after last iteration
-    final_issues = run_all_checks(source_code)
+    final_issues = run_all_checks(source_code) or _dry_run(source_code)
     if not final_issues:
         return {
             "approved": True,
