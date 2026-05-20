@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Playground · Stock Quant System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    /* ── Playground-specific overrides ── */
+    .pg-layout   { display:flex; gap:24px; padding:28px; max-width:1400px; margin:0 auto; }
+    .pg-sidebar  { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:16px; }
+    .pg-main     { flex:1; min-width:0; display:flex; flex-direction:column; gap:20px; }
+
+    /* drop zone */
+    .drop-zone {
+      border: 2px dashed var(--border2);
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: var(--surface);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: rgba(124,157,255,.06);
+    }
+    .drop-zone .dz-icon  { font-size: 32px; margin-bottom: 10px; }
+    .drop-zone .dz-label { font-size: 13px; color: var(--text-muted); }
+    .drop-zone .dz-file  { font-size: 13px; font-weight: 600; color: var(--green); margin-top:8px; }
+
+    /* config panel */
+    .config-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .config-card h3 { font-size:13px; font-weight:700; color:var(--text-muted);
+                      text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px; }
+    .config-row  { display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
+    .config-row label { font-size:12px; color:var(--text-muted); }
+    .config-row select, .config-row input {
+      background:var(--surface3); border:1px solid var(--border);
+      border-radius:var(--radius-sm); color:var(--text); padding:7px 10px;
+      font-size:13px; width:100%;
+    }
+    .config-row select:focus, .config-row input:focus {
+      outline:none; border-color:var(--accent);
+    }
+    .real-only { display:none; }
+    .run-btn-lg {
+      width:100%; padding:12px; font-size:15px; font-weight:700;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#fff; border:none; border-radius:var(--radius); cursor:pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .run-btn-lg:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); }
+    .run-btn-lg:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+
+    /* status bar */
+    #pgStatus {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:14px 18px; font-size:13px;
+      display:none;
+    }
+    #pgStatus.running { color:var(--yellow); }
+    #pgStatus.ok      { color:var(--green); }
+    #pgStatus.err     { color:var(--red); }
+
+    /* code preview */
+    .code-preview {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); overflow:hidden; display:none;
+    }
+    .code-preview-header {
+      background:var(--surface2); border-bottom:1px solid var(--border);
+      padding:10px 16px; font-size:12px; color:var(--text-muted);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .code-preview pre { max-height:240px; overflow-y:auto; padding:16px; margin:0; font-size:12px; }
+
+    /* results */
+    #pgResults { display:none; }
+    .pg-section-title {
+      font-size:12px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--text-muted); margin-bottom:12px;
+    }
+    .candle-wrap { height:340px; width:100%; }
+
+    /* regime badges */
+    .regime-badges { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+    .regime-badge {
+      font-size:11px; padding:3px 10px; border-radius:20px;
+      border:1px solid var(--border); color:var(--text-muted); background:var(--surface3);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <span class="logo"><a href="/" style="color:inherit;text-decoration:none">⬛ Stock Quant System</a></span>
+    <span class="tagline">Strategy Playground — upload &amp; run any strategy against synthetic data</span>
+    <nav style="margin-left:auto;display:flex;gap:16px;font-size:13px">
+      <a href="/" style="color:var(--text-muted);text-decoration:none">← Back to Analyzer</a>
+    </nav>
+  </div>
+</header>
+
+<div class="pg-layout">
+
+  <!-- ── Left sidebar: upload + config ── -->
+  <aside class="pg-sidebar">
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="dropZone">
+      <div class="dz-icon">📂</div>
+      <div class="dz-label">Drop your <code>*_run.py</code> or strategy <code>.py</code> here<br>or click to browse</div>
+      <div class="dz-file" id="dzFilename"></div>
+      <input type="file" id="fileInput" accept=".py" style="display:none" />
+    </div>
+
+    <!-- Code preview -->
+    <div class="code-preview" id="codePreview">
+      <div class="code-preview-header">
+        <span id="codePreviewName">strategy.py</span>
+        <span id="codeLineCount"></span>
+      </div>
+      <pre><code id="codePreviewEl" class="language-python"></code></pre>
+    </div>
+
+    <!-- Data config -->
+    <div class="config-card">
+      <h3>Data Source</h3>
+      <div class="config-row">
+        <label>Mode</label>
+        <select id="dataModeSelect">
+          <option value="synthetic" selected>Synthetic (no API key needed)</option>
+          <option value="real">Real market data (yfinance)</option>
+        </select>
+      </div>
+      <div class="config-row real-only" id="tickerRow">
+        <label>Ticker</label>
+        <input id="tickerInput" type="text" value="NVDA" placeholder="e.g. NVDA" />
+      </div>
+      <div class="config-row real-only" id="periodRow">
+        <label>Period</label>
+        <select id="periodSelect">
+          <option value="1y">1 Year</option>
+          <option value="2y" selected>2 Years</option>
+          <option value="5y">5 Years</option>
+        </select>
+      </div>
+
+      <!-- Synthetic controls -->
+      <div id="syntheticControls">
+        <div class="config-row">
+          <label>Market Regime</label>
+          <select id="trendSelect">
+            <option value="up" selected>Bull Market (uptrend)</option>
+            <option value="down">Bear Market (downtrend)</option>
+            <option value="sideways">Sideways / Ranging</option>
+            <option value="volatile">High-Volatility / Stress</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label>Volatility</label>
+          <select id="volatilitySelect">
+            <option value="low">Low (quiet market)</option>
+            <option value="medium" selected>Medium (normal)</option>
+            <option value="high">High (turbulent)</option>
+          </select>
+        </div>
+        <div class="config-row">
+          <label>Number of bars (trading days)</label>
+          <input id="nBarsInput" type="number" value="504" min="60" max="2000" step="60" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Run config -->
+    <div class="config-card">
+      <h3>Backtest Config</h3>
+      <div class="config-row">
+        <label>Initial Capital ($)</label>
+        <input id="capitalInput" type="number" value="10000" min="1000" step="1000" />
+      </div>
+    </div>
+
+    <button class="run-btn-lg" id="runBtn" disabled>▶ Run Backtest</button>
+
+  </aside>
+
+  <!-- ── Main results area ── -->
+  <main class="pg-main">
+
+    <div id="pgStatus"></div>
+
+    <!-- Empty state -->
+    <div id="pgEmpty" style="color:var(--text-muted);padding:60px 0;text-align:center;font-size:14px">
+      Upload a strategy file on the left to get started.<br><br>
+      <small>Download strategy files from the <a href="/" style="color:var(--accent)">Analyzer</a> using the <strong>⬇ Strategy</strong> or <strong>⬇ Runner</strong> button.</small>
+    </div>
+
+    <!-- Results -->
+    <div id="pgResults">
+
+      <!-- Run summary bar -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap">
+        <span id="runSummaryLabel" style="font-size:14px;font-weight:700"></span>
+        <div class="regime-badges" id="regimeBadges"></div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="pg-section-title">Performance Metrics</div>
+      <div id="pgMetrics" class="metrics-row" style="margin-bottom:20px"></div>
+
+      <!-- Walk-forward -->
+      <div id="pgWalkforward" class="walkforward-card" style="margin-bottom:20px" hidden>
+        <h4>Walk-Forward Validation <span class="wf-badge">In-sample 70% / Out-of-sample 30%</span></h4>
+        <div id="pgWfTable"></div>
+      </div>
+
+      <!-- Candlestick chart -->
+      <div class="chart-card full-width" style="margin-bottom:20px">
+        <div class="signal-chart-header">
+          <h4>Candlestick Chart &amp; Trade Signals</h4>
+          <div class="signal-legend">
+            <span class="legend-dot buy"></span>Buy
+            <span class="legend-dot sell"></span>Sell
+          </div>
+        </div>
+        <div id="pgCandleChart" class="candle-wrap"></div>
+      </div>
+
+      <!-- Equity curve -->
+      <div class="charts-grid" style="margin-bottom:20px">
+        <div class="chart-card full-width">
+          <h4>Equity Curve vs Buy &amp; Hold</h4>
+          <canvas id="pgEquityChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Drawdown</h4>
+          <canvas id="pgDrawdownChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4>Trade P&amp;L Distribution</h4>
+          <canvas id="pgPnlChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Trade log -->
+      <div class="pg-section-title">Trade Log</div>
+      <div class="table-wrap" style="margin-bottom:20px">
+        <table id="pgTradeLog">
+          <thead>
+            <tr><th>#</th><th>Entry</th><th>Exit</th>
+            <th>Entry $</th><th>Exit $</th><th>Size</th>
+            <th>P&amp;L</th><th>Return %</th><th>Days</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div><!-- /#pgResults -->
+  </main>
+
+</div><!-- /.pg-layout -->
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="/static/playground.js"></script>
+</body>
+</html>

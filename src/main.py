@@ -4,8 +4,8 @@ import logging
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import FastAPI, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
@@ -348,6 +348,94 @@ async def run_with_params(
             yield event
 
     return EventSourceResponse(stream())
+
+
+@app.post("/api/playground/run")
+async def playground_run(
+    file: UploadFile,
+    data_mode:  str   = Form("synthetic"),
+    ticker:     str   = Form("NVDA"),
+    period:     str   = Form("2y"),
+    capital:    float = Form(10000.0),
+    trend:      str   = Form("up"),
+    volatility: str   = Form("medium"),
+    n_bars:     int   = Form(504),
+):
+    """
+    Upload a strategy .py file and run it against synthetic or real data.
+
+    Returns JSON with metrics, equity_curve, trade_log, price_series, signals.
+    """
+    from src.tools.backtest_runner import run_backtest
+    from src.tools.synthetic_data import generate_synthetic_ohlcv
+    from src.tools.indicators import compute_indicators
+
+    source_bytes = await file.read()
+    try:
+        source_code = source_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="File must be UTF-8 encoded Python.")
+
+    # ── Build DataFrame ───────────────────────────────────────────────────────
+    if data_mode == "real":
+        try:
+            from src.tools.fetch_data import fetch_ohlcv
+            df_raw = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: fetch_ohlcv(ticker.upper(), period)
+            )
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not fetch data for {ticker}: {e}")
+    else:
+        df_raw = generate_synthetic_ohlcv(
+            n=max(60, min(n_bars, 2000)),
+            trend=trend,
+            volatility=volatility,
+        )
+
+    try:
+        df = compute_indicators(df_raw)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Indicator computation failed: {e}")
+
+    # ── Run backtest ──────────────────────────────────────────────────────────
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: run_backtest(source_code, df, capital)
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # OHLCV for the candlestick chart (keep all columns)
+    ohlcv = [
+        {
+            "time":   str(idx.date()),
+            "open":   round(float(row["Open"]),  4),
+            "high":   round(float(row["High"]),  4),
+            "low":    round(float(row["Low"]),   4),
+            "close":  round(float(row["Close"]), 4),
+            "volume": int(row["Volume"]),
+        }
+        for idx, row in df_raw.iterrows()
+    ]
+
+    return JSONResponse({
+        "metrics":      result["metrics"],
+        "equity_curve": result["equity_curve"],
+        "trade_log":    result["trade_log"],
+        "walkforward":  result.get("walkforward", {}),
+        "ohlcv":        ohlcv,
+        "signals":      result["signals"],
+        "start_date":   result["start_date"],
+        "end_date":     result["end_date"],
+        "data_mode":    data_mode,
+        "ticker":       ticker.upper() if data_mode == "real" else "SYNTHETIC",
+        "n_bars":       len(df),
+    })
+
+
+@app.get("/api/playground")
+async def playground_page():
+    return FileResponse("frontend/playground.html")
 
 
 @app.get("/health")
