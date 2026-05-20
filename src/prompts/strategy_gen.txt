@@ -33,7 +33,9 @@ TA HELPER FUNCTIONS (use these directly with self.I — do NOT reimplement them)
 FORBIDDEN — these patterns will cause runtime errors:
 - `import ta`, `import talib`, `import pandas_ta`, `import finta`, `import stockstats`
 - Calling `ta.*`, `talib.*`, etc.
-- `backtesting.indicators.*` — this submodule does NOT exist. Never use `backtesting.indicators.SMA(...)`, `backtesting.indicators.ATR(...)`, etc. Use the TA helpers listed above (e.g. `self.I(SMA, close, n)`) instead.
+- Any `import` statement at all — everything you need is already in scope. Do NOT write `import backtesting`, `import backtesting as bt`, `import numpy`, `import pandas`, etc.
+- `backtesting.indicators.*` or `bt.indicators.*` — this submodule does NOT exist.
+- `backtesting.lib.SMA`, `backtesting.lib.RSI`, `backtesting.lib.EMA`, etc. — `backtesting.lib` only has `crossover`, `cross`, `barssince`, `resample_apply`. It has NO indicator functions. Use the TA helpers listed above (e.g. `self.I(SMA, close, n)`).
 - Defining indicators as instance methods (e.g. `self.SMA(...)`) — call the module-level helpers directly.
 - `np.convolve(values, weights, mode='valid')` for a moving average — this returns a SHORTER array and breaks the `self.I()` length contract. **Use `self.I(SMA, close, n)` instead.**
 - Any function passed to `self.I()` that returns an array shorter than the input. Length MUST be preserved (rolling/ewm-based math is fine; convolve with mode='valid' is not).

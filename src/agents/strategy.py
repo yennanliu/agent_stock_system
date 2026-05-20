@@ -1,7 +1,9 @@
 import re
 from pathlib import Path
 
-from crewai import Agent, Task
+from crewai import Agent, LLM, Task
+
+from src.config import OPENAI_API_KEY
 
 
 # ── Response parser ───────────────────────────────────────────────────────────
@@ -45,8 +47,11 @@ def extract_parameters(source_code: str) -> dict:
 
 _SYSTEM_PROMPT = Path(__file__).parent.parent / "prompts" / "strategy_gen.txt"
 
+_llm = LLM(model="gpt-4o", api_key=OPENAI_API_KEY)
+
 strategy_agent = Agent(
     role="Quantitative Strategy Developer",
+    llm=_llm,
     goal=(
         "Design and implement a backtesting.py-compatible Strategy class for a "
         "given stock, based on the provided market summary."
@@ -62,12 +67,15 @@ strategy_agent = Agent(
 
 
 def build_strategy_task(ticker: str, market_sum: str) -> Task:
+    rules = _SYSTEM_PROMPT.read_text() if _SYSTEM_PROMPT.exists() else ""
     return Task(
         description=(
-            f"Design a quantitative trading strategy for {ticker}.\n\n"
+            f"{rules}\n\n"
+            f"---\n"
+            f"NOW DESIGN A STRATEGY FOR: {ticker}\n\n"
             f"Market summary:\n{market_sum}\n\n"
-            "Follow the system instructions exactly. Output one ```python``` block "
-            "with the Strategy class, then a ## Explanation section."
+            "Output exactly one ```python``` code block with the Strategy class, "
+            "then a ## Explanation section."
         ),
         expected_output=(
             "A ```python``` code block containing a Strategy subclass, "

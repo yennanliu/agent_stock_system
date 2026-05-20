@@ -9,6 +9,9 @@ FORBIDDEN_BUILTINS = {"open", "eval", "compile"}
 # TA libraries not installed in the runtime sandbox
 UNAVAILABLE_TA_LIBS = {"ta", "talib", "pandas_ta", "finta", "stockstats", "ta_lib"}
 
+# Functions that exist in backtesting.lib (the only valid ones to use from that module)
+_VALID_BACKTESTING_LIB = {"crossover", "cross", "barssince", "resample_apply"}
+
 
 def syntax_check(src: str) -> list[str]:
     try:
@@ -132,12 +135,49 @@ def api_conformance_check(src: str) -> list[str]:
     return issues
 
 
+def import_check(src: str) -> list[str]:
+    """Any import statement in strategy code is unnecessary and likely harmful."""
+    issues = []
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names = ", ".join(a.name for a in node.names)
+            issues.append(
+                f"Remove 'import {names}' — all required names (Strategy, np, pd, "
+                "crossover, SMA, EMA, RSI, ATR, …) are already in scope. "
+                "Do NOT add any import statements."
+            )
+        if isinstance(node, ast.ImportFrom):
+            issues.append(
+                f"Remove 'from {node.module} import ...' — all required names are "
+                "already in scope. Do NOT add any import statements."
+            )
+    return issues
+
+
 def safety_check(src: str) -> list[str]:
     issues = []
     try:
         tree = ast.parse(src)
     except SyntaxError:
         return []
+
+    # Build a map of local name → canonical module name for all imports.
+    # e.g. `import backtesting as bt`  → {"bt": "backtesting"}
+    #      `import backtesting`         → {"backtesting": "backtesting"}
+    import_aliases: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                local = alias.asname if alias.asname else alias.name.split(".")[0]
+                import_aliases[local] = alias.name.split(".")[0]
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                local = alias.asname if alias.asname else alias.name
+                import_aliases[local] = node.module.split(".")[0]
 
     for node in ast.walk(tree):
         # Forbidden / unavailable imports
@@ -161,43 +201,47 @@ def safety_check(src: str) -> list[str]:
                         f"Unavailable TA library: '{node.module}'. "
                         "Rewrite using pd.Series and np operations only."
                     )
+                # from backtesting import indicators
+                if node.module == "backtesting" and any(
+                    alias.name == "indicators" for alias in (node.names or [])
+                ):
+                    issues.append(
+                        "backtesting.indicators does not exist. "
+                        "Use module-level TA helpers (SMA, EMA, RSI, ATR, …) with self.I()."
+                    )
 
         # Attribute access on unavailable TA libs (e.g. ta.trend.sma_indicator)
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            if node.value.id in UNAVAILABLE_TA_LIBS:
+            canonical = import_aliases.get(node.value.id, node.value.id)
+            if canonical in UNAVAILABLE_TA_LIBS:
                 issues.append(
                     f"Unavailable TA library call: '{node.value.id}.{node.attr}'. "
                     "Rewrite using pd.Series and np operations only."
                 )
 
-        # backtesting.indicators does not exist — catch both attribute access
-        # (backtesting.indicators.SMA) and import (from backtesting import indicators)
-        if isinstance(node, ast.Attribute):
-            # Walk chain: backtesting.indicators.SMA → value is backtesting.indicators
-            if (
-                isinstance(node.value, ast.Attribute)
-                and node.value.attr == "indicators"
-                and isinstance(node.value.value, ast.Name)
-                and node.value.value.id == "backtesting"
-            ):
+            # <backtesting_alias>.indicators — e.g. bt.indicators or backtesting.indicators
+            if canonical == "backtesting" and node.attr == "indicators":
                 issues.append(
-                    f"backtesting.indicators does not exist. "
-                    f"Use the module-level TA helper instead: "
-                    f"self.I({node.attr}, self.data.Close, n)."
-                )
-            elif node.attr == "indicators" and isinstance(node.value, ast.Name) and node.value.id == "backtesting":
-                issues.append(
-                    "backtesting.indicators does not exist. "
+                    f"backtesting.indicators does not exist (used as '{node.value.id}.indicators'). "
                     "Use module-level TA helpers (SMA, EMA, RSI, ATR, …) with self.I()."
                 )
-        if isinstance(node, ast.ImportFrom):
-            if node.module == "backtesting" and any(
-                alias.name == "indicators" for alias in (node.names or [])
-            ):
-                issues.append(
-                    "backtesting.indicators does not exist. "
-                    "Use module-level TA helpers (SMA, EMA, RSI, ATR, …) with self.I()."
-                )
+
+        # <backtesting_alias>.indicators.FUNC — e.g. bt.indicators.SMA(...)
+        # also <backtesting_alias>.lib.FUNC where FUNC is not a real lib function
+        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Attribute):
+            parent_name = node.value.value.id if isinstance(node.value.value, ast.Name) else None
+            if parent_name and import_aliases.get(parent_name, parent_name) == "backtesting":
+                if node.value.attr == "indicators":
+                    issues.append(
+                        f"backtesting.indicators does not exist ('{parent_name}.indicators.{node.attr}'). "
+                        f"Use the module-level TA helper instead: self.I({node.attr}, self.data.Close, n)."
+                    )
+                elif node.value.attr == "lib" and node.attr not in _VALID_BACKTESTING_LIB:
+                    issues.append(
+                        f"backtesting.lib.{node.attr} does not exist. "
+                        f"backtesting.lib only provides: {', '.join(sorted(_VALID_BACKTESTING_LIB))}. "
+                        f"Use the module-level TA helper instead: self.I({node.attr}, self.data.Close, n)."
+                    )
 
         # Forbidden builtins
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
@@ -208,4 +252,4 @@ def safety_check(src: str) -> list[str]:
 
 
 def run_all_checks(src: str) -> list[str]:
-    return syntax_check(src) + api_conformance_check(src) + safety_check(src)
+    return syntax_check(src) + import_check(src) + api_conformance_check(src) + safety_check(src)
