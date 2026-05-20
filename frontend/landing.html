@@ -53,14 +53,13 @@
       text-align: center; padding: 100px 24px 60px;
       position: relative; overflow: hidden;
     }
-    .hero::before {
-      content: '';
-      position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,157,255,.12) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(184,155,255,.08) 0%, transparent 60%);
-      pointer-events: none;
+    /* Canvas replaces the static ::before gradient */
+    #hero-canvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 0;
     }
+    .hero > *:not(#hero-canvas) { position: relative; z-index: 1; }
+
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
       background: rgba(124,157,255,.1); border: 1px solid rgba(124,157,255,.25);
@@ -251,6 +250,7 @@
 
 <!-- ── Hero ── -->
 <section class="hero">
+  <canvas id="hero-canvas"></canvas>
   <div class="hero-badge">
     <span class="dot"></span>
     <span data-i18n="landing.badge">AI-Powered · Live System</span>
@@ -476,6 +476,153 @@ Object.assign(TRANSLATIONS['zh-TW'], {
   'landing.footer_built':'以 FastAPI、CrewAI 與 GPT-4o 構建',
 });
 applyI18n();
+</script>
+
+<script>
+/* ── Animated hero canvas ── */
+(function () {
+  const canvas = document.getElementById('hero-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, mouse = { x: 0, y: 0 };
+
+  /* ── Resize ── */
+  function resize() {
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ── Mouse parallax ── */
+  window.addEventListener('mousemove', e => {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+  });
+
+  /* ── Orbs (slow-moving radial blobs) ── */
+  const ORBS = [
+    { x: 0.50, y: 0.05, r: 0.55, col: 'rgba(124,157,255,', base: 0.10, spd: 0.00018 },
+    { x: 0.85, y: 0.80, r: 0.45, col: 'rgba(184,155,255,', base: 0.07, spd: 0.00013 },
+    { x: 0.15, y: 0.65, r: 0.35, col: 'rgba(61,232,160,',  base: 0.06, spd: 0.00022 },
+    { x: 0.70, y: 0.30, r: 0.30, col: 'rgba(124,157,255,', base: 0.05, spd: 0.00016 },
+  ];
+
+  /* ── Grid lines ── */
+  const GRID_COLS = 12, GRID_ROWS = 8;
+
+  /* ── Particles ── */
+  const N_PARTICLES = 80;
+  const particles = Array.from({ length: N_PARTICLES }, () => ({
+    x: Math.random(),
+    y: Math.random(),
+    r: Math.random() * 1.5 + 0.4,
+    a: Math.random() * 0.5 + 0.1,
+    vx: (Math.random() - 0.5) * 0.00012,
+    vy: (Math.random() - 0.5) * 0.00012,
+  }));
+
+  /* ── Floating stock-chart line segments ── */
+  const N_LINES = 5;
+  const lines = Array.from({ length: N_LINES }, (_, i) => ({
+    pts: generateLine(12 + Math.floor(Math.random() * 8)),
+    y0:  0.10 + i * 0.16 + Math.random() * 0.08,
+    alpha: 0.04 + Math.random() * 0.05,
+    spd: 0.00006 + Math.random() * 0.00004,
+    phase: Math.random() * Math.PI * 2,
+  }));
+
+  function generateLine(n) {
+    const pts = [{ x: 0, y: 0 }];
+    for (let i = 1; i < n; i++) {
+      pts.push({ x: i / (n - 1), y: pts[i-1].y + (Math.random() - 0.48) * 0.12 });
+    }
+    // normalize y to [-0.5, 0.5]
+    const mn = Math.min(...pts.map(p=>p.y)), mx = Math.max(...pts.map(p=>p.y));
+    const rng = mx - mn || 1;
+    pts.forEach(p => p.y = (p.y - mn) / rng - 0.5);
+    return pts;
+  }
+
+  let t = 0;
+
+  function draw(ts) {
+    requestAnimationFrame(draw);
+    t = ts * 0.001;
+
+    ctx.clearRect(0, 0, W, H);
+
+    /* parallax offset */
+    const px = (mouse.x / (window.innerWidth  || 1) - 0.5) * 30;
+    const py = (mouse.y / (window.innerHeight || 1) - 0.5) * 20;
+
+    /* ── Background base ── */
+    ctx.fillStyle = '#080a11';
+    ctx.fillRect(0, 0, W, H);
+
+    /* ── Animated orbs ── */
+    ORBS.forEach((o, i) => {
+      const ox = o.x + Math.sin(t * o.spd * 1000 + i * 1.3) * 0.08;
+      const oy = o.y + Math.cos(t * o.spd * 700  + i * 0.9) * 0.06;
+      const cx = ox * W + px * (0.3 + i * 0.15);
+      const cy = oy * H + py * (0.2 + i * 0.12);
+      const rad = o.r * Math.min(W, H);
+      const pulse = o.base + Math.sin(t * 0.8 + i * 1.7) * 0.025;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      g.addColorStop(0,   o.col + pulse + ')');
+      g.addColorStop(0.5, o.col + (pulse * 0.3) + ')');
+      g.addColorStop(1,   o.col + '0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    });
+
+    /* ── Subtle dot grid ── */
+    ctx.save();
+    const gx = W / GRID_COLS, gy = H / GRID_ROWS;
+    for (let c = 0; c <= GRID_COLS; c++) {
+      for (let r = 0; r <= GRID_ROWS; r++) {
+        const dx = c * gx + px * 0.08;
+        const dy = r * gy + py * 0.08;
+        ctx.beginPath();
+        ctx.arc(dx, dy, 1, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(124,157,255,0.12)';
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    /* ── Floating price-chart lines ── */
+    lines.forEach(ln => {
+      const yBase  = ln.y0 * H + py * 0.05;
+      const height = H * 0.10;
+      const offset = (t * ln.spd * 1000 + ln.phase) % 1;
+
+      ctx.save();
+      ctx.globalAlpha = ln.alpha + Math.sin(t * 0.4 + ln.phase) * 0.015;
+      ctx.strokeStyle = '#7c9dff';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ln.pts.forEach((p, i) => {
+        const x = ((p.x + offset) % 1) * W;
+        const y = yBase + p.y * height;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    /* ── Particles ── */
+    particles.forEach(p => {
+      p.x = (p.x + p.vx + 1) % 1;
+      p.y = (p.y + p.vy + 1) % 1;
+      ctx.beginPath();
+      ctx.arc(p.x * W + px * 0.04, p.y * H + py * 0.04, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(184,155,255,${p.a})`;
+      ctx.fill();
+    });
+  }
+
+  requestAnimationFrame(draw);
+})();
 </script>
 </body>
 </html>

@@ -4,19 +4,13 @@ import logging
 import uuid as _uuid_module
 from typing import AsyncGenerator
 
-from crewai import Crew, Process
-
-from src.agents.market_data import market_data_agent, build_market_data_task, get_cached_df
 from src.agents.strategy import (
-    strategy_agent,
-    build_strategy_task,
-    parse_strategy_response,
     generate_strategy_direct,
     extract_strategy_name,
     extract_parameters,
 )
-from src.agents.python_master import python_master_agent, review_and_repair
-from src.agents.backtest import backtest_agent, build_backtest_task, generate_explanation
+from src.agents.python_master import review_and_repair
+from src.agents.backtest import generate_explanation
 from src.agents.critique import generate_critique
 from src.tools.fetch_data import fetch_ohlcv
 from src.tools.indicators import compute_indicators, market_summary

@@ -44,8 +44,8 @@ app = FastAPI(title="Stock Quant System", lifespan=lifespan)
 @app.get("/api/analyze")
 async def analyze(
     ticker: str = Query(..., description="Stock ticker, e.g. NVDA"),
-    strategy_type: str = Query("auto", description="Strategy style: trend_following, mean_reversion, momentum, breakout, auto"),
-    indicators: str = Query("auto", description="Indicators to use: sma, ema, rsi, macd, bollinger, atr, combined, auto"),
+    strategy_type: str = Query("auto", description="Strategy style: auto, trend_following, mean_reversion, momentum, breakout"),
+    indicators: str = Query("auto", description="Indicators: auto, sma, ema, rsi, macd, bollinger, atr, combined"),
     period: str = Query(DATA_PERIOD, description="Data period: 1y, 2y, 5y, 10y"),
 ):
     """Full pipeline streamed via SSE, backed by the background job queue."""
