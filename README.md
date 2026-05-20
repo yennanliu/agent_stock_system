@@ -18,6 +18,13 @@ echo "OPENAI_API_KEY=sk-..." >> .env
 # 3. Run
 uv run uvicorn src.main:app --reload --port 9000
 
+
+uv run uvicorn src.main:app --reload --reload-dir src --reload-dir frontend --port 9000
+
+
+
+
+
 # 4. Open
 open http://localhost:9000
 ```

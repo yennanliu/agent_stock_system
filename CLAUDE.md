@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies (Python 3.12 required)
 uv sync
 
-# Run the server
-uv run uvicorn src.main:app --reload --port 9000
+# Run the server (--reload-dir prevents strategies/ writes from triggering a restart)
+uv run uvicorn src.main:app --reload --reload-dir src --reload-dir frontend --port 9000
 # or via project script (port 8000):
 uv run dev
 
