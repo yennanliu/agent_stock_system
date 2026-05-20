@@ -170,6 +170,35 @@ def safety_check(src: str) -> list[str]:
                     "Rewrite using pd.Series and np operations only."
                 )
 
+        # backtesting.indicators does not exist — catch both attribute access
+        # (backtesting.indicators.SMA) and import (from backtesting import indicators)
+        if isinstance(node, ast.Attribute):
+            # Walk chain: backtesting.indicators.SMA → value is backtesting.indicators
+            if (
+                isinstance(node.value, ast.Attribute)
+                and node.value.attr == "indicators"
+                and isinstance(node.value.value, ast.Name)
+                and node.value.value.id == "backtesting"
+            ):
+                issues.append(
+                    f"backtesting.indicators does not exist. "
+                    f"Use the module-level TA helper instead: "
+                    f"self.I({node.attr}, self.data.Close, n)."
+                )
+            elif node.attr == "indicators" and isinstance(node.value, ast.Name) and node.value.id == "backtesting":
+                issues.append(
+                    "backtesting.indicators does not exist. "
+                    "Use module-level TA helpers (SMA, EMA, RSI, ATR, …) with self.I()."
+                )
+        if isinstance(node, ast.ImportFrom):
+            if node.module == "backtesting" and any(
+                alias.name == "indicators" for alias in (node.names or [])
+            ):
+                issues.append(
+                    "backtesting.indicators does not exist. "
+                    "Use module-level TA helpers (SMA, EMA, RSI, ATR, …) with self.I()."
+                )
+
         # Forbidden builtins
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in FORBIDDEN_BUILTINS:
