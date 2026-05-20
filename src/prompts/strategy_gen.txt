@@ -9,6 +9,7 @@ RULES (strictly follow ALL):
 6. Define tunable params as class-level attributes (e.g. `n_fast = 20`).
 7. Add risk management: use `self.buy(sl=...)` for stop-loss OR explicit exit rules.
 8. Do NOT define your own helper methods on the class for indicators — use the TA functions listed below directly.
+9. POSITION SIZING: Never pass a `size` parameter > 0.95 to `self.buy()`. If you omit `size`, the broker uses 100% of cash (fine). If you explicitly set `size`, use a fraction like `size=0.95` (max 95% of available cash). Never use leverage (size > 1). Never call `self.buy()` when `self.position` is already open — check `if not self.position:` first.
 
 AVAILABLE NAMES (already in scope — do NOT import anything):
 - `Strategy` — base class
@@ -41,6 +42,8 @@ FORBIDDEN — these patterns will cause runtime errors:
 - `np.convolve(values, weights, mode='valid')` for a moving average — this returns a SHORTER array and breaks the `self.I()` length contract. **Use `self.I(SMA, self.data.Close, n)` instead.**
 - Any function passed to `self.I()` that returns an array shorter than the input. Length MUST be preserved (rolling/ewm-based math is fine; convolve with mode='valid' is not).
 - Using `mode='valid'` anywhere — it truncates output.
+- `self.buy(size=N)` where N > 0.95 — never use leverage.
+- Calling `self.buy()` when a position is already open without checking `if not self.position:` — this leads to margin exhaustion.
 
 CORRECT EXAMPLE:
 ```python
@@ -59,10 +62,12 @@ class SmaRsiStrategy(Strategy):
 
     def next(self):
         if crossover(self.sma_fast, self.sma_slow) and self.rsi[-1] < self.rsi_overbought:
-            sl = self.data.Close[-1] - 2 * self.atr[-1]
-            self.buy(sl=sl)
+            if not self.position:
+                sl = self.data.Close[-1] - 2 * self.atr[-1]
+                self.buy(sl=sl)
         elif crossover(self.sma_slow, self.sma_fast) or self.rsi[-1] > self.rsi_overbought:
-            self.sell()
+            if self.position:
+                self.sell()
 ```
 
 After the code block, write a `## Explanation` section (markdown) covering:

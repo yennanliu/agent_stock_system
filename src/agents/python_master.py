@@ -31,7 +31,7 @@ def _dry_run(source_code: str) -> list[str]:
     )
     try:
         from src.tools.backtest_runner import run_backtest
-        run_backtest(source_code, df, initial_cash=10_000)
+        run_backtest(source_code, df, initial_cash=10_000)  # finalize_trades=True already set
         return []
     except Exception as e:
         return [f"Dry-run execution error (fix this before the real backtest): {e}"]

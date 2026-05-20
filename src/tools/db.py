@@ -132,9 +132,157 @@ def save_strategy(
         f"from backtesting import Strategy\n"
         f"from backtesting.lib import crossover\n\n"
     )
+    safe_name = re.sub(r"[^\w]", "_", name)
     path = _strategy_filename(sid, ticker, name)
     path.write_text(header + source_code, encoding="utf-8")
+
+    # Write a standalone runner next to the strategy file
+    runner_path = STRATEGIES_DIR / f"{ticker}_{safe_name}_{sid}_run.py"
+    _write_runner(runner_path, path.name, ticker, name, sid)
     return sid
+
+
+_RUNNER_TEMPLATE = '''\
+#!/usr/bin/env python
+"""
+Standalone runner for: {name}  (ticker: {ticker}, id: {sid})
+
+HOW TO RUN
+----------
+1. Install dependencies (one-time):
+       pip install backtesting yfinance pandas numpy
+
+2. Run:
+       python {runner_filename}
+
+   Or with a custom date range:
+       python {runner_filename} --start 2022-01-01 --end 2024-01-01
+
+3. The script opens an interactive backtest chart in your browser.
+   Close it to exit.
+"""
+import argparse
+import sys
+from pathlib import Path
+
+# ── resolve strategy file relative to this runner ─────────────────────────────
+_HERE = Path(__file__).parent
+_STRATEGY_FILE = _HERE / "{strategy_filename}"
+
+try:
+    import numpy as np
+    import pandas as pd
+    import yfinance as yf
+    from backtesting import Backtest, Strategy
+    from backtesting.lib import crossover, cross, barssince
+except ImportError as e:
+    print(f"Missing dependency: {{e}}")
+    print("Run:  pip install backtesting yfinance pandas numpy")
+    sys.exit(1)
+
+# ── TA helper functions (same as the live system) ─────────────────────────────
+def SMA(values, n):
+    return pd.Series(values).rolling(n).mean().values
+def EMA(values, n):
+    return pd.Series(values).ewm(span=n, adjust=False).mean().values
+def RSI(values, n=14):
+    s = pd.Series(values)
+    delta = s.diff()
+    gain  = delta.clip(lower=0).ewm(com=n - 1, adjust=True).mean()
+    loss  = (-delta.clip(upper=0)).ewm(com=n - 1, adjust=True).mean()
+    rs    = gain / loss.replace(0, float("nan"))
+    return (100 - 100 / (1 + rs)).values
+def MACD(values, fast=12, slow=26):
+    s = pd.Series(values)
+    return (s.ewm(span=fast, adjust=False).mean() - s.ewm(span=slow, adjust=False).mean()).values
+def MACD_SIGNAL(values, fast=12, slow=26, signal=9):
+    return pd.Series(MACD(values, fast, slow)).ewm(span=signal, adjust=False).mean().values
+def BBANDS_UPPER(values, n=20, k=2.0):
+    s = pd.Series(values); m = s.rolling(n).mean(); return (m + k * s.rolling(n).std()).values
+def BBANDS_MID(values, n=20):
+    return pd.Series(values).rolling(n).mean().values
+def BBANDS_LOWER(values, n=20, k=2.0):
+    s = pd.Series(values); m = s.rolling(n).mean(); return (m - k * s.rolling(n).std()).values
+def ATR(high, low, close, n=14):
+    h, l, c = pd.Series(high), pd.Series(low), pd.Series(close)
+    tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+    return tr.ewm(com=n - 1, adjust=True).mean().values
+def STDEV(values, n=20):
+    return pd.Series(values).rolling(n).std().values
+def HIGHEST(values, n):
+    return pd.Series(values).rolling(n).max().values
+def LOWEST(values, n):
+    return pd.Series(values).rolling(n).min().values
+
+# ── load strategy class from the .py file ────────────────────────────────────
+_scope = dict(
+    Strategy=Strategy, np=np, pd=pd,
+    crossover=crossover, cross=cross, barssince=barssince,
+    SMA=SMA, EMA=EMA, RSI=RSI, MACD=MACD, MACD_SIGNAL=MACD_SIGNAL,
+    BBANDS_UPPER=BBANDS_UPPER, BBANDS_MID=BBANDS_MID, BBANDS_LOWER=BBANDS_LOWER,
+    ATR=ATR, STDEV=STDEV, HIGHEST=HIGHEST, LOWEST=LOWEST,
+)
+exec(compile(_STRATEGY_FILE.read_text(), str(_STRATEGY_FILE), "exec"), _scope)
+StrategyClass = next(
+    v for v in _scope.values()
+    if isinstance(v, type) and issubclass(v, Strategy) and v is not Strategy
+)
+
+# ── CLI args ──────────────────────────────────────────────────────────────────
+parser = argparse.ArgumentParser()
+parser.add_argument("--ticker", default="{ticker}")
+parser.add_argument("--period", default="2y")
+parser.add_argument("--start",  default=None, help="e.g. 2022-01-01")
+parser.add_argument("--end",    default=None, help="e.g. 2024-01-01")
+parser.add_argument("--cash",   type=float, default=10000)
+parser.add_argument("--no-plot", action="store_true")
+args = parser.parse_args()
+
+# ── fetch data ────────────────────────────────────────────────────────────────
+print(f"Fetching {{args.ticker}} data…")
+if args.start:
+    df = yf.download(args.ticker, start=args.start, end=args.end, auto_adjust=True, progress=False)
+else:
+    df = yf.download(args.ticker, period=args.period, auto_adjust=True, progress=False)
+
+if df.empty:
+    print(f"No data returned for {{args.ticker}}. Check the ticker symbol.")
+    sys.exit(1)
+
+df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+df = df[["Open", "High", "Low", "Close", "Volume"]].dropna()
+print(f"  {{len(df)}} trading days loaded ({{}}{{}})".format(
+    df.index[0].date(), " → " + str(df.index[-1].date())))
+
+# ── run backtest ──────────────────────────────────────────────────────────────
+bt = Backtest(df, StrategyClass, cash=args.cash, commission=0.002,
+              exclusive_orders=True, finalize_trades=True)
+stats = bt.run()
+
+print("\\n── Results ──────────────────────────────────────────────────")
+for key in ["Return [%]", "Return (Ann.) [%]", "Sharpe Ratio",
+            "Max. Drawdown [%]", "Win Rate [%]", "# Trades"]:
+    val = stats.get(key)
+    if val is not None:
+        print(f"  {{key:<25}} {{val:.2f}}")
+print()
+
+if not args.no_plot:
+    bt.plot()
+'''
+
+
+def _write_runner(runner_path: Path, strategy_filename: str, ticker: str, name: str, sid: int) -> None:
+    runner_path.write_text(
+        _RUNNER_TEMPLATE.format(
+            runner_filename=runner_path.name,
+            strategy_filename=strategy_filename,
+            ticker=ticker,
+            name=name,
+            sid=sid,
+        ),
+        encoding="utf-8",
+    )
 
 
 def get_strategy_filepath(strategy_id: int) -> Path | None:

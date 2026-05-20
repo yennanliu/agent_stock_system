@@ -29,6 +29,7 @@ const refreshHistBtn     = $('refreshHistoryBtn');
 const runWithParamsBtn   = $('runWithParamsBtn');
 const resetParamsBtn     = $('resetParamsBtn');
 const paramActions       = $('paramActions');
+const runnerBtn          = $('runnerBtn');
 const optimizeBtn        = $('optimizeBtn');
 const applyOptimizedBtn  = $('applyOptimizedBtn');
 
@@ -83,6 +84,10 @@ function startAnalysis(ticker) {
       setActiveHistory(data.backtest_id);
       refreshHistoryList();
       appendLog('critique_complete', `Revised strategy loaded. Compare with original run #${data.original_backtest_id}.`);
+    }
+    if (data.stage === 'critique_skipped') {
+      es.close();
+      analyzeBtn.disabled = false;
     }
     if (data.stage === 'error') { es.close(); analyzeBtn.disabled = false; }
   };
@@ -203,9 +208,11 @@ async function loadStrategy(id) {
   $('strategyName').textContent   = data.name || 'Generated Strategy';
   $('strategyExplanation').textContent = data.description || '';
 
-  // Download link
+  // Download links
   downloadBtn.href = `/api/strategies/${id}/download`;
   downloadBtn.download = `${data.ticker}_${data.name}_${id}.py`;
+  runnerBtn.href = `/api/strategies/${id}/runner`;
+  runnerBtn.download = `${data.ticker}_${data.name}_${id}_run.py`;
 
   // Review badge
   const badge = $('reviewBadge');

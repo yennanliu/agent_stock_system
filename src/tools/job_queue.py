@@ -94,7 +94,9 @@ async def publish(job_id: str, event: dict) -> None:
     try:
         import json
         d = json.loads(stage)
-        if d.get("stage") == "complete" or d.get("stage") == "critique_complete":
+        # "complete" is an intermediate stage — critique still runs after it.
+        # Mark done only when the full pipeline finishes.
+        if d.get("stage") in ("critique_complete", "critique_skipped"):
             job.status = "done"
         elif d.get("stage") == "error":
             job.status = "error"
@@ -123,12 +125,13 @@ async def stream_job(job_id: str) -> AsyncGenerator[dict, None]:
     # Stream new live events
     while True:
         try:
-            event = await asyncio.wait_for(job.queue.get(), timeout=60)
+            event = await asyncio.wait_for(job.queue.get(), timeout=300)
             yield event
             try:
                 import json
                 d = json.loads(event.get("data", "{}"))
-                if d.get("stage") in ("complete", "critique_complete", "error"):
+                # "complete" is NOT a terminal stage — critique runs after it.
+                if d.get("stage") in ("critique_complete", "critique_skipped", "error"):
                     return
             except Exception:
                 pass

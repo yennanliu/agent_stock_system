@@ -181,7 +181,7 @@ async def run_analyze_pipeline(
         )
     except Exception as e:
         log.warning("Critique generation failed (non-fatal): %s", e)
-        yield _sse("critique", f"Critique skipped: {e}")
+        yield _sse("critique_skipped", f"Critique skipped: {e}")
         return
 
     yield _sse(
@@ -194,6 +194,7 @@ async def run_analyze_pipeline(
 
     revised_code = critique_result.get("revised_code", "")
     if not revised_code:
+        yield _sse("critique_skipped", "Critique produced no revised code.")
         return
 
     # Review the revised code
@@ -201,7 +202,7 @@ async def run_analyze_pipeline(
         None, review_and_repair, revised_code
     )
     if not revised_review["approved"]:
-        yield _sse("critique", "Revised strategy failed code review — skipping.")
+        yield _sse("critique_skipped", "Revised strategy failed code review — skipping.")
         return
 
     revised_approved = revised_review["source_code"]
@@ -212,7 +213,7 @@ async def run_analyze_pipeline(
             None, lambda: run_backtest(revised_approved, df, DEFAULT_CAPITAL)
         )
     except RuntimeError as e:
-        yield _sse("critique", f"Revised backtest failed: {e}")
+        yield _sse("critique_skipped", f"Revised backtest failed: {e}")
         return
 
     revised_name     = extract_strategy_name(revised_approved) or f"{strategy_name}_Revised"

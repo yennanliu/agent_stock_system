@@ -19,6 +19,7 @@ from src.tools.db import (
     get_run_raw_data_path,
     list_strategies,
     list_runs_for_ticker,
+    STRATEGIES_DIR,
 )
 from src.tools.job_queue import create_job, job_status, stream_job, start_pipeline_job
 
@@ -192,6 +193,24 @@ async def strategy_source(strategy_id: int):
             raise HTTPException(status_code=404, detail="Strategy not found")
         return PlainTextResponse(row["source_code"], media_type="text/x-python")
     return PlainTextResponse(path.read_text(encoding="utf-8"), media_type="text/x-python")
+
+
+@app.get("/api/strategies/{strategy_id}/runner")
+async def strategy_runner(strategy_id: int):
+    """Download the standalone runner script for this strategy."""
+    import re as _re
+    row = get_strategy(strategy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    safe_name = _re.sub(r"[^\w]", "_", row["name"])
+    runner_path = STRATEGIES_DIR / f"{row['ticker']}_{safe_name}_{strategy_id}_run.py"
+    if not runner_path.exists():
+        # Regenerate on demand
+        from src.tools.db import _write_runner, _strategy_filename
+        strat_path = _strategy_filename(strategy_id, row["ticker"], row["name"])
+        _write_runner(runner_path, strat_path.name, row["ticker"], row["name"], strategy_id)
+    filename = runner_path.name
+    return FileResponse(str(runner_path), media_type="text/x-python", filename=filename)
 
 
 @app.get("/api/strategies/{strategy_id}/download")

@@ -283,5 +283,38 @@ def safety_check(src: str) -> list[str]:
     return issues
 
 
+def position_sizing_check(src: str) -> list[str]:
+    """Detect buy(size=N) where N > 0.95 (leverage) or bare buy() inside an already-open position."""
+    issues = []
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return []
+
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "buy"
+        ):
+            continue
+        for kw in node.keywords:
+            if kw.arg == "size" and isinstance(kw.value, ast.Constant):
+                val = kw.value.value
+                if isinstance(val, (int, float)) and val > 0.95:
+                    issues.append(
+                        f"self.buy(size={val}) exceeds safe position limit. "
+                        "Use size ≤ 0.95 to avoid margin exhaustion. "
+                        "Omitting size (100% of cash) is also acceptable."
+                    )
+    return issues
+
+
 def run_all_checks(src: str) -> list[str]:
-    return syntax_check(src) + import_check(src) + api_conformance_check(src) + safety_check(src)
+    return (
+        syntax_check(src)
+        + import_check(src)
+        + api_conformance_check(src)
+        + safety_check(src)
+        + position_sizing_check(src)
+    )

@@ -174,7 +174,7 @@ def optimize_backtest(
     if not grid:
         return {}
 
-    bt = Backtest(df, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
+    bt = Backtest(df, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True, finalize_trades=True)
     try:
         opt_stats = bt.optimize(
             **{k: v for k, v in grid.items()},
@@ -219,6 +219,7 @@ def run_backtest(
         cash=initial_cash,
         commission=0.002,
         exclusive_orders=True,
+        finalize_trades=True,
     )
     try:
         stats = bt.run()
@@ -251,8 +252,8 @@ def run_backtest(
     df_out = df.iloc[split:]
     if len(df_in) > 50 and len(df_out) > 20:
         try:
-            wf_in  = Backtest(df_in,  StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
-            wf_out = Backtest(df_out, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
+            wf_in  = Backtest(df_in,  StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True, finalize_trades=True)
+            wf_out = Backtest(df_out, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True, finalize_trades=True)
             walkforward = {
                 "split_date":  str(df.index[split].date()),
                 "in_sample":   _extract_metrics(wf_in.run()),
