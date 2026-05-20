@@ -15,6 +15,7 @@ const TRANSLATIONS = {
     'nav.guide':       '📖 Eval Guide',
     'nav.landing':     '🏠 Home',
     'nav.back_analyzer': '← Back to Analyzer',
+    'nav.strategies':    '📚 Strategies',
 
     // Header tagline
     'tagline.main':       'AI-powered quantitative strategy generation & backtesting',
@@ -158,6 +159,7 @@ const TRANSLATIONS = {
     'nav.guide':       '📖 評估指南',
     'nav.landing':     '🏠 首頁',
     'nav.back_analyzer': '← 返回分析器',
+    'nav.strategies':    '📚 策略庫',
 
     // Header tagline
     'tagline.main':       'AI 驅動的量化策略生成與回測系統',

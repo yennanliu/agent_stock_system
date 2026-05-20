@@ -496,6 +496,35 @@ async def analyzer():
     return FileResponse("frontend/index.html")
 
 
+@app.get("/strategies")
+async def strategies_library():
+    return FileResponse("frontend/strategies.html")
+
+
+@app.get("/api/strategy-templates")
+async def strategy_templates():
+    """List all built-in strategy templates."""
+    from src.strategies.registry import REGISTRY
+    return REGISTRY
+
+
+@app.get("/api/strategy-templates/{template_id}/code")
+async def strategy_template_code(template_id: str):
+    """Return the source code for a strategy template."""
+    from src.strategies.registry import get_template, get_template_code
+    meta = get_template(template_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    code = get_template_code(template_id)
+    if code is None:
+        raise HTTPException(status_code=404, detail="Template source not found")
+    filename = f"{template_id}.py"
+    return PlainTextResponse(
+        code, media_type="text/x-python",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/landing")
 async def landing():
     return FileResponse("frontend/landing.html")

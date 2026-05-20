@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Library · Stock Quant System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .strat-layout { max-width: 1200px; margin: 0 auto; padding: 32px 28px; }
+
+    /* Filter bar */
+    .filter-bar {
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 28px;
+    }
+    .filter-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 6px 16px; font-size: 13px; font-weight: 500;
+      color: var(--text-muted); cursor: pointer; transition: all .2s;
+    }
+    .filter-btn:hover    { border-color: var(--accent); color: var(--text); }
+    .filter-btn.active   { border-color: var(--accent); color: var(--accent); background: rgba(124,157,255,.08); }
+    .filter-label { font-size: 12px; color: var(--text-muted); font-weight: 600;
+                    text-transform: uppercase; letter-spacing: .06em; }
+
+    /* Grid */
+    .strat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    /* Card */
+    .strat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; display: flex; flex-direction: column;
+      gap: 14px; transition: border-color .25s, transform .25s;
+      cursor: pointer;
+    }
+    .strat-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .card-title  { font-size: 16px; font-weight: 800; line-height: 1.3; }
+    .diff-badge  {
+      font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .diff-badge.Beginner     { background: rgba(61,232,160,.12); color: var(--green); }
+    .diff-badge.Intermediate { background: rgba(251,191,36,.12);  color: var(--yellow); }
+    .diff-badge.Advanced     { background: rgba(248,113,113,.12); color: var(--red); }
+
+    .cat-tag {
+      display: inline-block; font-size: 11px; font-weight: 600;
+      padding: 2px 10px; border-radius: 20px;
+      background: var(--surface3); color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .card-desc  { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+    .card-works { font-size: 12px; color: var(--text-muted); }
+    .card-works strong { color: var(--accent); }
+
+    .card-params {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .param-chip {
+      font-size: 11px; font-family: var(--mono, monospace);
+      background: var(--surface3); border: 1px solid var(--border);
+      border-radius: 6px; padding: 2px 8px; color: var(--text-muted);
+    }
+
+    .card-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 4px; }
+    .btn-view     {
+      flex: 1; padding: 9px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-muted); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .2s; text-align: center;
+    }
+    .btn-view:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-dl {
+      padding: 9px 14px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: opacity .2s; white-space: nowrap; text-decoration: none;
+      display: flex; align-items: center;
+    }
+    .btn-dl:hover { opacity: .88; }
+
+    /* Code modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; width: 100%; max-width: 780px; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 24px; border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 18px; font-weight: 800; }
+    .modal-close { background: none; border: none; color: var(--text-muted);
+                   font-size: 24px; cursor: pointer; padding: 4px; }
+    .modal-close:hover { color: var(--text); }
+    .modal-meta { display: flex; gap: 10px; padding: 12px 24px;
+                  border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+    .modal-body { overflow-y: auto; padding: 0; flex: 1; }
+    .modal-body pre { margin: 0; padding: 20px 24px; font-size: 13px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border);
+                    display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .modal-hint { font-size: 12px; color: var(--text-muted); }
+
+    @media (max-width: 600px) {
+      .strat-grid { grid-template-columns: 1fr; }
+      .modal { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="/" style="color:inherit;text-decoration:none"><span class="logo">⬛ Stock Quant System</span></a>
+    <span class="tagline">Strategy Library — Hand-crafted templates ready to backtest</span>
+    <nav style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px">
+      <a href="/" class="nav-link" data-i18n="nav.landing">🏠 Home</a>
+      <a href="/app" class="nav-link" data-i18n="nav.analyzer">Analyzer</a>
+      <a href="/api/playground" class="nav-link" data-i18n="nav.playground">🧪 Playground</a>
+      <a href="/guide" class="nav-link" data-i18n="nav.guide">📖 Eval Guide</a>
+      <div class="lang-switcher">
+        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
+        <button class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW')">中文</button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="strat-layout">
+  <div style="margin-bottom:24px">
+    <h1 style="font-size:28px;font-weight:900;margin-bottom:8px">Strategy Library</h1>
+    <p style="font-size:15px;color:var(--text-muted);max-width:600px">
+      7 production-quality strategy templates with detailed explanations. Download any
+      strategy and run it instantly in the <a href="/api/playground" style="color:var(--accent)">Playground</a>,
+      or use it as a starting point for the AI Analyzer.
+    </p>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <span class="filter-label">Category:</span>
+    <button class="filter-btn active" data-cat="all">All</button>
+    <button class="filter-btn" data-cat="Trend Following">Trend Following</button>
+    <button class="filter-btn" data-cat="Mean Reversion">Mean Reversion</button>
+    <button class="filter-btn" data-cat="Momentum">Momentum</button>
+    <button class="filter-btn" data-cat="Breakout">Breakout</button>
+    <button class="filter-btn" data-cat="Volatility">Volatility</button>
+    <span class="filter-label" style="margin-left:12px">Difficulty:</span>
+    <button class="filter-btn active" data-diff="all">All</button>
+    <button class="filter-btn" data-diff="Beginner">Beginner</button>
+    <button class="filter-btn" data-diff="Intermediate">Intermediate</button>
+    <button class="filter-btn" data-diff="Advanced">Advanced</button>
+  </div>
+
+  <div class="strat-grid" id="stratGrid"></div>
+</div>
+
+<!-- Code modal -->
+<div class="modal-overlay hidden" id="codeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle"></h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-meta" id="modalMeta"></div>
+    <div class="modal-body">
+      <pre><code id="modalCode" class="language-python"></code></pre>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-hint">💡 Download and drop into the <a href="/api/playground" style="color:var(--accent)">Playground</a> to test across regimes instantly.</span>
+      <a id="modalDlBtn" class="btn-dl" download>⬇ Download .py</a>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="/static/i18n.js"></script>
+<script>
+'use strict';
+let _templates = [];
+let _filterCat  = 'all';
+let _filterDiff = 'all';
+
+// ── Load templates ──────────────────────────────────────────────────────────
+async function loadTemplates() {
+  _templates = await fetch('/api/strategy-templates').then(r => r.json());
+  renderGrid();
+}
+
+// ── Filter buttons ──────────────────────────────────────────────────────────
+document.querySelectorAll('[data-cat]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-cat]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _filterCat = btn.dataset.cat;
+    renderGrid();
+  });
+});
+document.querySelectorAll('[data-diff]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-diff]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _filterDiff = btn.dataset.diff;
+    renderGrid();
+  });
+});
+
+// ── Render grid ─────────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('stratGrid');
+  const filtered = _templates.filter(t => {
+    if (_filterCat  !== 'all' && t.category   !== _filterCat)  return false;
+    if (_filterDiff !== 'all' && t.difficulty !== _filterDiff) return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    grid.innerHTML = '<p style="color:var(--text-muted);padding:20px 0">No strategies match the selected filters.</p>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(t => `
+    <div class="strat-card" onclick="openModal('${t.id}')">
+      <div class="card-header">
+        <div class="card-title">${esc(t.name)}</div>
+        <span class="diff-badge ${t.difficulty}">${t.difficulty}</span>
+      </div>
+      <div><span class="cat-tag">${esc(t.category)}</span></div>
+      <p class="card-desc">${esc(t.description)}</p>
+      <div class="card-works"><strong>✓ Works best:</strong> ${esc(t.when_works)}</div>
+      <div class="card-params">
+        ${Object.entries(t.params).map(([k,v]) =>
+          `<span class="param-chip">${esc(k)} = ${v}</span>`
+        ).join('')}
+      </div>
+      <div class="card-actions" onclick="event.stopPropagation()">
+        <button class="btn-view" onclick="openModal('${t.id}')">👁 View Code</button>
+        <a class="btn-dl" href="/api/strategy-templates/${t.id}/code" download="${t.id}.py">⬇ Download</a>
+      </div>
+    </div>`).join('');
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+async function openModal(id) {
+  const meta = _templates.find(t => t.id === id);
+  if (!meta) return;
+  document.getElementById('modalTitle').textContent = meta.name;
+  document.getElementById('modalMeta').innerHTML = `
+    <span class="diff-badge ${meta.difficulty}">${meta.difficulty}</span>
+    <span class="cat-tag">${esc(meta.category)}</span>
+    ${meta.tags.map(tag => `<span class="param-chip">${esc(tag)}</span>`).join('')}`;
+
+  const dl = document.getElementById('modalDlBtn');
+  dl.href     = `/api/strategy-templates/${id}/code`;
+  dl.download = `${id}.py`;
+
+  const codeEl = document.getElementById('modalCode');
+  codeEl.textContent = 'Loading…';
+  document.getElementById('codeModal').classList.remove('hidden');
+
+  const code = await fetch(`/api/strategy-templates/${id}/code`).then(r => r.text());
+  codeEl.textContent = code;
+  hljs.highlightElement(codeEl);
+}
+
+function closeModal() {
+  document.getElementById('codeModal').classList.add('hidden');
+}
+document.getElementById('codeModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+loadTemplates();
+applyI18n();
+</script>
+</body>
+</html>

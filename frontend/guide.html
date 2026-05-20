@@ -106,8 +106,10 @@
     <span class="logo">⬛ Stock Quant System</span>
     <span class="tagline" data-i18n="tagline.guide">How to Evaluate Quantitative Trading Results</span>
     <nav style="margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px">
-      <a href="/app" style="color:var(--text-muted);text-decoration:none" data-i18n="nav.analyzer">Analyzer</a>
-      <a href="/api/playground" style="color:var(--text-muted);text-decoration:none" data-i18n="nav.playground">🧪 Playground</a>
+      <a href="/" class="nav-link" data-i18n="nav.landing">🏠 Home</a>
+      <a href="/app" class="nav-link" data-i18n="nav.analyzer">Analyzer</a>
+      <a href="/strategies" class="nav-link" data-i18n="nav.strategies">📚 Strategies</a>
+      <a href="/api/playground" class="nav-link" data-i18n="nav.playground">🧪 Playground</a>
       <div class="lang-switcher">
         <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
         <button class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW')">中文</button>
@@ -132,6 +134,13 @@
     <a class="toc-link" href="#walkforward" data-i18n="guide.s6_title">Walk-Forward Validation</a>
     <a class="toc-link" href="#pitfalls" data-i18n="guide.s7_title">Common Pitfalls</a>
     <a class="toc-link" href="#quickref" data-i18n="guide.s8_title">Quick Reference</a>
+    <div class="toc-section-title">Advanced</div>
+    <a class="toc-link" href="#sizing">Position Sizing</a>
+    <a class="toc-link" href="#strategy-types">Strategy Types</a>
+    <a class="toc-link" href="#regimes">Market Regimes</a>
+    <a class="toc-link" href="#expectancy">Expectancy & R:R</a>
+    <a class="toc-link" href="#checklist">Pre-Deploy Checklist</a>
+    <a class="toc-link" href="#live">Backtest → Live</a>
   </aside>
 
   <!-- Content -->
@@ -378,6 +387,254 @@
       </table>
       <div class="callout tip" style="margin-top:16px">
         <strong>* </strong><span data-i18n="guide.winrate_note">Win Rate context: 30% win rate is fine for trend-following if average win is 3× average loss (expectancy = 0.3×3 − 0.7×1 = +0.2 per trade).</span>
+      </div>
+    </section>
+
+    <!-- ── Section 9: Position Sizing ── -->
+    <section class="guide-section" id="sizing">
+      <h2><span class="section-icon">⚖️</span> Position Sizing</h2>
+      <p class="intro">
+        Position sizing is the single biggest determinant of whether a strategy survives long enough to be profitable.
+        A perfect strategy with wrong sizing will blow up; a mediocre strategy with disciplined sizing can survive.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4>Fixed Fractional (Kelly-inspired)</h4>
+          <div class="formula">size = f × capital / stop_distance</div>
+          <p>Risk a fixed percentage <em>f</em> (typically 1–2%) of total capital per trade.
+             If capital = $10,000, f = 2%, and stop is $5 away: size = $200/$5 = 40 shares.
+             This ensures no single loss can wipe out the account.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Volatility Targeting</h4>
+          <div class="formula">size = target_vol / (ATR / price)</div>
+          <p>Scale position inversely with current volatility. In calm markets you take
+             larger positions; in turbulent markets you automatically reduce size. This
+             keeps daily P&L variance roughly constant across market regimes.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Full Kelly Criterion</h4>
+          <div class="formula">f* = (p×b − q) / b</div>
+          <p>Where p = win probability, q = 1-p, b = win/loss ratio. Kelly maximises
+             long-run geometric growth. In practice, use <em>half-Kelly</em> (f*/2) to
+             reduce variance — full Kelly produces extreme drawdowns.</p>
+        </div>
+        <div class="mg-card">
+          <h4>In this system</h4>
+          <div class="formula">self.buy()  ← uses 100% of cash</div>
+          <p>By default, backtesting.py's <code>exclusive_orders=True</code> with no
+             <code>size=</code> argument means the strategy uses all available cash per
+             entry. This simplifies analysis but overstates real-world returns.
+             Add <code>size=0.25</code> to limit each trade to 25% of capital.</p>
+        </div>
+      </div>
+      <div class="callout tip">
+        <strong>💡 Practical rule:</strong> Never risk more than 2% of total capital on a single trade.
+        With a $10,000 account and a 2% rule, 10 consecutive losses still leaves $8,171 — survivable.
+        With 5% per trade, 10 losses leaves $5,987 — psychologically devastating.
+      </div>
+    </section>
+
+    <!-- ── Section 10: Strategy Types Explained ── -->
+    <section class="guide-section" id="strategy-types">
+      <h2><span class="section-icon">🗺️</span> Strategy Types — When to Use Each</h2>
+      <p class="intro">
+        Each strategy type has a market environment where it excels and one where it fails badly.
+        Matching the strategy to the current regime is as important as the strategy itself.
+      </p>
+      <table class="thresh-table">
+        <thead>
+          <tr><th>Type</th><th>Core Idea</th><th>Best Market</th><th>Worst Market</th><th>Typical Win Rate</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Trend Following</strong><br><small>SMA, EMA, Turtle</small></td>
+            <td>Ride momentum — buy strength, sell weakness</td>
+            <td>Strong bull/bear trends</td>
+            <td>Sideways, choppy</td>
+            <td>35–45% <span class="tag ok">low but profitable</span></td>
+          </tr>
+          <tr>
+            <td><strong>Mean Reversion</strong><br><small>RSI, Bollinger</small></td>
+            <td>Buy oversold, sell overbought — price returns to average</td>
+            <td>Range-bound, low volatility</td>
+            <td>Strong trends, crashes</td>
+            <td>60–75% <span class="tag good">high but small wins</span></td>
+          </tr>
+          <tr>
+            <td><strong>Momentum</strong><br><small>52-week high, MACD</small></td>
+            <td>Buy what's already going up — relative strength persists</td>
+            <td>Bull markets with sector rotation</td>
+            <td>Bear markets, corrections</td>
+            <td>40–55% <span class="tag ok">moderate</span></td>
+          </tr>
+          <tr>
+            <td><strong>Breakout</strong><br><small>Donchian, ATR Channel</small></td>
+            <td>Enter when price escapes a range with force</td>
+            <td>Post-consolidation expansion</td>
+            <td>False breakouts in ranging market</td>
+            <td>30–45% <span class="tag warn">low — big winners needed</span></td>
+          </tr>
+          <tr>
+            <td><strong>Volatility</strong><br><small>Bollinger Squeeze, VIX</small></td>
+            <td>Trade the expansion after a compression</td>
+            <td>Markets transitioning from calm to active</td>
+            <td>Persistent low-vol grinding markets</td>
+            <td>45–55% <span class="tag ok">moderate</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <strong>⚠ The #1 mistake:</strong> Using a mean-reversion strategy in a trending market.
+        When a stock in a strong downtrend hits RSI=30, it usually goes to RSI=20, then RSI=10.
+        Always check whether the broader market is trending before using mean-reversion.
+      </div>
+    </section>
+
+    <!-- ── Section 11: Market Regimes ── -->
+    <section class="guide-section" id="regimes">
+      <h2><span class="section-icon">🌡️</span> Reading Market Regimes</h2>
+      <p class="intro">
+        The same strategy can be profitable in one regime and deeply unprofitable in another.
+        Before deploying any strategy, identify the current regime and whether the strategy
+        is designed for it.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4>Bull Market Signals</h4>
+          <p>Price above 200-day MA • 200-day MA sloping up • New 52-week highs outpace new lows
+             • Advancing stocks outnumber declining stocks • VIX below 20.
+             <br><br><strong>Best strategies:</strong> Momentum, trend following, breakout.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Bear Market Signals</h4>
+          <p>Price below 200-day MA • MA sloping down • Most stocks hitting 52-week lows
+             • VIX above 30 • Defensive sectors (utilities, staples) outperforming.
+             <br><br><strong>Best strategies:</strong> Short-selling, inverse ETF trend following, cash.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Sideways / Ranging Market</h4>
+          <p>Price oscillating between support/resistance • 200-day MA flat • ATR declining
+             • Bollinger Bands squeezing. Can last months.
+             <br><br><strong>Best strategies:</strong> Mean reversion, Bollinger squeeze setup (wait for breakout).</p>
+        </div>
+        <div class="mg-card">
+          <h4>High-Volatility / Crisis</h4>
+          <p>VIX above 40 • Large daily gaps • Correlations spiking toward 1.0 • News-driven moves
+             dwarf any technical signal.
+             <br><br><strong>Best strategies:</strong> Reduce position size sharply. Most systematic strategies fail here.</p>
+        </div>
+      </div>
+      <div class="callout tip">
+        <strong>💡 Simple regime filter:</strong> Before running any strategy, check if SPY (or the stock) is above or below its 200-day SMA.
+        Above = use trend/momentum strategies. Below = use mean-reversion or reduce exposure to 50%.
+      </div>
+    </section>
+
+    <!-- ── Section 12: Expectancy & Risk/Reward ── -->
+    <section class="guide-section" id="expectancy">
+      <h2><span class="section-icon">🧮</span> Trade Expectancy & Risk/Reward</h2>
+      <p class="intro">
+        Expectancy is the average profit/loss per dollar risked across all trades.
+        It's the most important single number that determines whether a strategy is viable — more fundamental than win rate or Sharpe.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4>Expectancy Formula</h4>
+          <div class="formula">E = (P_win × Avg_win) − (P_loss × Avg_loss)</div>
+          <p>Where P_win = win rate, P_loss = 1 − win rate. A positive expectancy means the
+             strategy makes money on average per trade. This must be positive <em>before</em>
+             looking at Sharpe or CAGR.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Risk/Reward Ratio</h4>
+          <div class="formula">RR = Avg_win / Avg_loss</div>
+          <p>A 1:2 risk/reward means your average win is 2× your average loss. Paired with a
+             40% win rate: E = 0.4×2 − 0.6×1 = +0.2 per unit risked. Profitable.
+             A 1:1 RR requires >50% win rate to break even.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Minimum Viable Combinations</h4>
+          <p style="font-family:var(--mono,monospace);font-size:12px;line-height:2">
+            Win 30% → need RR ≥ 2.33:1<br>
+            Win 40% → need RR ≥ 1.5:1<br>
+            Win 50% → need RR ≥ 1.0:1<br>
+            Win 60% → need RR ≥ 0.67:1<br>
+            Win 70% → need RR ≥ 0.43:1
+          </p>
+        </div>
+        <div class="mg-card">
+          <h4>Why Trend-Following Works with Low Win Rates</h4>
+          <p>A typical Turtle-style strategy wins 35% of trades but has an RR of 3:1.
+             E = 0.35×3 − 0.65×1 = +0.4 per trade. The few big winners more than pay
+             for all the small losses. This is why <em>cutting losses quickly and letting
+             winners run</em> is the cardinal rule of trend following.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Section 13: Checklist Before Deploying ── -->
+    <section class="guide-section" id="checklist">
+      <h2><span class="section-icon">✅</span> Pre-Deployment Checklist</h2>
+      <p class="intro">
+        Before risking real money on any backtested strategy, work through this checklist.
+        If any item fails, the strategy is not ready.
+      </p>
+      <table class="thresh-table">
+        <thead><tr><th>#</th><th>Check</th><th>Why It Matters</th><th>Minimum Bar</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><strong>≥ 30 trades</strong></td><td>Statistical significance</td><td><span class="tag good">30+ closed trades</span></td></tr>
+          <tr><td>2</td><td><strong>≥ 2 years of data</strong></td><td>Covers at least one market cycle</td><td><span class="tag good">2y+ daily bars</span></td></tr>
+          <tr><td>3</td><td><strong>Positive expectancy</strong></td><td>Must make money per trade on average</td><td><span class="tag good">E &gt; 0</span></td></tr>
+          <tr><td>4</td><td><strong>Sharpe ≥ 0.7</strong></td><td>Risk-adjusted return is acceptable</td><td><span class="tag ok">0.7+ (1.0 preferred)</span></td></tr>
+          <tr><td>5</td><td><strong>Walk-forward OOS/IS ≥ 0.5</strong></td><td>Not overfit to historical data</td><td><span class="tag ok">0.5× IS Sharpe</span></td></tr>
+          <tr><td>6</td><td><strong>Max DD survivable</strong></td><td>You will not abandon at the worst moment</td><td><span class="tag warn">Can you stomach 2× worst DD?</span></td></tr>
+          <tr><td>7</td><td><strong>Passed regime stress test</strong></td><td>Works across bull, bear, sideways</td><td><span class="tag ok">Positive in 2/3 regimes</span></td></tr>
+          <tr><td>8</td><td><strong>Commission included</strong></td><td>0.2% per trade is modelled correctly</td><td><span class="tag good">Profitable after costs</span></td></tr>
+          <tr><td>9</td><td><strong>No look-ahead bias</strong></td><td>Only uses data available at decision time</td><td><span class="tag good">All indices use [-1] or earlier</span></td></tr>
+          <tr><td>10</td><td><strong>Position sizing defined</strong></td><td>Risk per trade is bounded</td><td><span class="tag good">≤ 2% capital at risk</span></td></tr>
+        </tbody>
+      </table>
+      <div class="callout danger">
+        <strong>🚨 Paper trade first:</strong> Even after passing this checklist, run the strategy
+        in paper (simulated) trading for 20–30 real signals before committing capital.
+        Execution gaps, data feed issues, and psychological factors only appear in live conditions.
+      </div>
+    </section>
+
+    <!-- ── Section 14: From Backtest to Live Trading ── -->
+    <section class="guide-section" id="live">
+      <h2><span class="section-icon">🚀</span> From Backtest to Live Trading</h2>
+      <p class="intro">
+        The gap between backtest performance and live performance is almost always negative —
+        and larger than expected. Understanding why helps you set realistic expectations.
+      </p>
+      <div class="metric-grid">
+        <div class="mg-card">
+          <h4>Execution Slippage</h4>
+          <p>Market orders fill at worse prices than the bar close used in backtests. For liquid
+             stocks on daily bars, this is typically 0.1–0.3% per trade. For intraday strategies
+             on small caps it can be 0.5–2%. Use limit orders where possible.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Bid-Ask Spread</h4>
+          <p>Not modelled in backtests using close prices. Add an extra 0.05–0.1% per trade for
+             large-cap stocks, 0.1–0.5% for small-caps. This system uses 0.2% commission which
+             approximates spread + brokerage for mid-large caps.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Psychological Discipline</h4>
+          <p>The hardest part. During drawdowns, the natural response is to stop following the
+             system. The Turtle traders who followed rules mechanically outperformed those who
+             "improved" them. Define your rules in advance and follow them exactly.</p>
+        </div>
+        <div class="mg-card">
+          <h4>Live Performance Expectation</h4>
+          <p>A realistic adjustment for a well-tested strategy:
+             <strong>Live CAGR ≈ Backtest CAGR × 0.6–0.7</strong>.
+             If backtest shows 20% CAGR, expect 12–14% live. If backtest shows 5%, live may
+             be negative after costs. Use this conservative adjustment when sizing positions.</p>
+        </div>
       </div>
     </section>
 
