@@ -14,6 +14,8 @@ from src.tools.db import (
     get_strategy,
     get_backtest,
     get_strategy_filepath,
+    get_run_source_path,
+    get_run_raw_data_path,
     list_strategies,
     list_runs_for_ticker,
 )
@@ -35,12 +37,20 @@ app = FastAPI(title="Stock Quant System", lifespan=lifespan)
 # ── SSE pipeline endpoints ────────────────────────────────────────────────────
 
 @app.get("/api/analyze")
-async def analyze(ticker: str = Query(..., description="Stock ticker, e.g. NVDA")):
+async def analyze(
+    ticker: str = Query(..., description="Stock ticker, e.g. NVDA"),
+    strategy_type: str = Query("auto", description="Strategy style: trend_following, mean_reversion, momentum, breakout, auto"),
+    indicators: str = Query("auto", description="Indicators to use: sma, ema, rsi, macd, bollinger, atr, combined, auto"),
+):
     """Full pipeline: data → strategy → review → backtest, streamed via SSE."""
     from src.crew import run_analyze_pipeline
 
     async def stream():
-        async for event in run_analyze_pipeline(ticker.upper()):
+        async for event in run_analyze_pipeline(
+            ticker.upper(),
+            strategy_type=strategy_type,
+            indicators=indicators,
+        ):
             yield event
 
     return EventSourceResponse(stream())
@@ -83,6 +93,43 @@ async def backtest_detail(run_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Backtest run not found")
     return row
+
+
+@app.get("/api/backtest/{run_id}/source")
+async def run_source(run_id: int):
+    """Return the strategy code snapshot saved at the time of this run."""
+    row = get_backtest(run_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Backtest run not found")
+    # Prefer file on disk; fall back to DB column
+    path = get_run_source_path(run_id)
+    if path:
+        code = path.read_text(encoding="utf-8")
+    elif row.get("source_code"):
+        code = row["source_code"]
+    else:
+        raise HTTPException(status_code=404, detail="Source code not available for this run")
+    ticker = row.get("ticker", "strategy")
+    return PlainTextResponse(
+        code,
+        media_type="text/x-python",
+        headers={"Content-Disposition": f'attachment; filename="run_{run_id}_{ticker}.py"'},
+    )
+
+
+@app.get("/api/backtest/{run_id}/rawdata")
+async def run_raw_data(run_id: int):
+    """Download the raw OHLCV + indicator CSV saved for this run."""
+    path = get_run_raw_data_path(run_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Raw data not available for this run")
+    row = get_backtest(run_id)
+    ticker = row.get("ticker", "data") if row else "data"
+    return FileResponse(
+        str(path),
+        media_type="text/csv",
+        filename=f"run_{run_id}_{ticker}_raw.csv",
+    )
 
 
 @app.get("/api/history/{ticker}")

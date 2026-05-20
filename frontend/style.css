@@ -333,6 +333,53 @@ tbody tr:hover td { background: var(--surface2); }
 .narrative strong { color: var(--accent2); }
 .narrative h3 { margin: 16px 0 8px; font-size: 14px; }
 
+/* ── Options row (dropdowns) ──────────────────────────────── */
+.options-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.option-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.option-group select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 180px;
+}
+.option-group select:focus { outline: none; border-color: var(--accent); }
+
+/* ── Run ID badge + download row ──────────────────────────── */
+.run-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.run-id-badge {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  color: var(--text-muted);
+}
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 760px) {
   .layout { flex-direction: column; height: auto; }

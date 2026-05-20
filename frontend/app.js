@@ -8,15 +8,20 @@ let equityChart = null, drawdownChart = null, pnlChart = null;
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const tickerInput    = $('tickerInput');
-const analyzeBtn     = $('analyzeBtn');
-const statusLog      = $('status-log');
-const strategyPanel  = $('strategy-panel');
-const backtestPanel  = $('backtest-panel');
-const runBtn         = $('runBtn');
-const downloadBtn    = $('downloadBtn');
-const historyList    = $('historyList');
-const refreshHistBtn = $('refreshHistoryBtn');
+const tickerInput        = $('tickerInput');
+const analyzeBtn         = $('analyzeBtn');
+const strategyTypeSelect = $('strategyTypeSelect');
+const indicatorsSelect   = $('indicatorsSelect');
+const statusLog          = $('status-log');
+const strategyPanel      = $('strategy-panel');
+const backtestPanel      = $('backtest-panel');
+const runBtn             = $('runBtn');
+const downloadBtn        = $('downloadBtn');
+const runIdBadge         = $('runIdBadge');
+const runSourceBtn       = $('runSourceBtn');
+const runDataBtn         = $('runDataBtn');
+const historyList        = $('historyList');
+const refreshHistBtn     = $('refreshHistoryBtn');
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshHistoryList();
@@ -37,7 +42,11 @@ function startAnalysis(ticker) {
   strategyPanel.hidden = true;
   backtestPanel.hidden = true;
 
-  const es = new EventSource(`/api/analyze?ticker=${ticker}`);
+  const strategyType = strategyTypeSelect.value;
+  const indicators   = indicatorsSelect.value;
+  const es = new EventSource(
+    `/api/analyze?ticker=${ticker}&strategy_type=${strategyType}&indicators=${indicators}`
+  );
   es.onmessage = async e => {
     const data = JSON.parse(e.data);
     appendLog(data.stage, data.message, data.stage === 'error');
@@ -181,6 +190,19 @@ async function loadBacktest(id) {
   renderPnlChart(data.trade_log);
   renderTradeLog(data.trade_log);
   $('narrative').innerHTML = marked.parse(data.explanation || '');
+
+  // Run ID badge + download buttons
+  runIdBadge.textContent = `Run #${id}`;
+  const ticker = data.ticker || '';
+
+  runSourceBtn.href = `/api/backtest/${id}/source`;
+  runSourceBtn.download = `run_${id}_${ticker}.py`;
+  runSourceBtn.hidden = !data.source_code;
+
+  runDataBtn.href = `/api/backtest/${id}/rawdata`;
+  runDataBtn.download = `run_${id}_${ticker}_raw.csv`;
+  runDataBtn.hidden = !data.raw_data_path;
+
   backtestPanel.hidden = false;
 }
 

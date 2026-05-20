@@ -66,14 +66,31 @@ strategy_agent = Agent(
 )
 
 
-def build_strategy_task(ticker: str, market_sum: str) -> Task:
+def build_strategy_task(
+    ticker: str,
+    market_sum: str,
+    strategy_type: str = "auto",
+    indicators: str = "auto",
+) -> Task:
     rules = _SYSTEM_PROMPT.read_text() if _SYSTEM_PROMPT.exists() else ""
+
+    preference_lines = []
+    if strategy_type and strategy_type != "auto":
+        preference_lines.append(f"Strategy type requested: {strategy_type}")
+    if indicators and indicators != "auto":
+        preference_lines.append(f"Preferred indicators: {indicators}")
+    preferences = (
+        "\nUSER PREFERENCES (must be followed):\n" + "\n".join(preference_lines) + "\n"
+        if preference_lines else ""
+    )
+
     return Task(
         description=(
             f"{rules}\n\n"
             f"---\n"
             f"NOW DESIGN A STRATEGY FOR: {ticker}\n\n"
-            f"Market summary:\n{market_sum}\n\n"
+            f"Market summary:\n{market_sum}\n"
+            f"{preferences}\n"
             "Output exactly one ```python``` code block with the Strategy class, "
             "then a ## Explanation section."
         ),

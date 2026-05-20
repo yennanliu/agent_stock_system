@@ -28,7 +28,11 @@ def _sse(stage: str, message: str, **kwargs) -> dict:
     return {"data": json.dumps({"stage": stage, "message": message, **kwargs})}
 
 
-async def run_analyze_pipeline(ticker: str) -> AsyncGenerator[dict, None]:
+async def run_analyze_pipeline(
+    ticker: str,
+    strategy_type: str = "auto",
+    indicators: str = "auto",
+) -> AsyncGenerator[dict, None]:
     """Full pipeline: data → strategy → review → backtest, yielding SSE events."""
 
     # ── Stage 1: Market Data ──────────────────────────────────────────────────
@@ -50,7 +54,7 @@ async def run_analyze_pipeline(ticker: str) -> AsyncGenerator[dict, None]:
     yield _sse("strategy", "Generating quantitative strategy…")
     await asyncio.sleep(0)
 
-    task = build_strategy_task(ticker, summary)
+    task = build_strategy_task(ticker, summary, strategy_type=strategy_type, indicators=indicators)
     crew = Crew(
         agents=[strategy_agent],
         tasks=[task],
@@ -138,6 +142,8 @@ async def run_analyze_pipeline(ticker: str) -> AsyncGenerator[dict, None]:
         equity_curve=bt_result["equity_curve"],
         trade_log=bt_result["trade_log"],
         explanation=narrative,
+        source_code=approved_code,
+        raw_df=df,
     )
 
     m = bt_result["metrics"]
@@ -197,6 +203,8 @@ async def run_backtest_pipeline(strategy: dict, period: str) -> AsyncGenerator[d
         equity_curve=bt_result["equity_curve"],
         trade_log=bt_result["trade_log"],
         explanation=narrative,
+        source_code=source_code,
+        raw_df=df,
     )
 
     m = bt_result["metrics"]

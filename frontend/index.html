@@ -37,6 +37,31 @@
         <input id="tickerInput" type="text" placeholder="Enter ticker (e.g. NVDA, AAPL, TSLA)" autocomplete="off" />
         <button id="analyzeBtn">Analyze</button>
       </div>
+      <div class="options-row">
+        <div class="option-group">
+          <label for="strategyTypeSelect">Strategy Type</label>
+          <select id="strategyTypeSelect">
+            <option value="auto">Auto (AI decides)</option>
+            <option value="trend_following">Trend Following</option>
+            <option value="mean_reversion">Mean Reversion</option>
+            <option value="momentum">Momentum</option>
+            <option value="breakout">Breakout</option>
+          </select>
+        </div>
+        <div class="option-group">
+          <label for="indicatorsSelect">Indicators</label>
+          <select id="indicatorsSelect">
+            <option value="auto">Auto (AI decides)</option>
+            <option value="sma">SMA Crossover</option>
+            <option value="ema">EMA Crossover</option>
+            <option value="rsi">RSI</option>
+            <option value="macd">MACD</option>
+            <option value="bollinger">Bollinger Bands</option>
+            <option value="atr">ATR-based</option>
+            <option value="combined">Combined (multiple)</option>
+          </select>
+        </div>
+      </div>
       <div id="status-log"></div>
     </section>
 
@@ -63,7 +88,14 @@
 
     <!-- Backtest panel -->
     <section id="backtest-panel" hidden>
-      <h2>Backtest Results</h2>
+      <div class="panel-header">
+        <h2>Backtest Results</h2>
+        <div class="run-actions">
+          <span id="runIdBadge" class="run-id-badge"></span>
+          <a id="runSourceBtn" class="icon-link" title="Download strategy code for this run" hidden>⬇ Run Code</a>
+          <a id="runDataBtn" class="icon-link" title="Download raw OHLCV + indicator CSV" hidden>⬇ Raw Data</a>
+        </div>
+      </div>
       <div id="metricsRow" class="metrics-row"></div>
 
       <div class="charts-grid">
