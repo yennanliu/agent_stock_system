@@ -101,6 +101,20 @@ strategy_agent = Agent(
 )
 
 
+def _recent_strategy_names(ticker: str, limit: int = 5) -> list[str]:
+    """Return names of the most recent strategies for this ticker (for diversity prompt)."""
+    try:
+        from src.tools.db import _conn  # local import to avoid circular at module load
+        with _conn() as con:
+            rows = con.execute(
+                "SELECT name FROM strategies WHERE ticker=? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (ticker.upper(), limit),
+            ).fetchall()
+        return [r["name"] for r in rows]
+    except Exception:
+        return []
+
+
 def generate_strategy_direct(
     ticker: str,
     market_sum: str,
@@ -124,8 +138,17 @@ def generate_strategy_direct(
         preference_lines.append(f"Preferred indicators: {indicators}")
     pref_block = ("\nUSER PREFERENCES (must be followed):\n" + "\n".join(preference_lines)) if preference_lines else ""
 
+    recent = _recent_strategy_names(ticker)
+    diversity_block = (
+        "\nDIVERSITY REQUIREMENT: The following strategies have already been generated for "
+        f"this ticker — generate something meaningfully different (different logic, different "
+        f"indicators, or different regime approach):\n"
+        + "\n".join(f"  - {n}" for n in recent)
+    ) if recent else ""
+
     user_msg = (
-        f"Design a strategy for: {ticker}\n\nMarket summary:\n{market_sum}{pref_block}"
+        f"Design a strategy for: {ticker}\n\nMarket summary:\n{market_sum}"
+        f"{pref_block}{diversity_block}"
     )
 
     response = _direct_client.chat.completions.create(

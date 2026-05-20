@@ -582,6 +582,16 @@ tbody tr:hover td { background: var(--surface2); }
   margin-top: 10px;
 }
 
+/* ── Candlestick chart container ──────────────────────────── */
+#candleChart { border-radius: var(--radius-sm); overflow: hidden; }
+
+/* ── Critique preview ─────────────────────────────────────── */
+#critiquePreview { margin-top: 24px; }
+#critiquePreview .narrative { max-height: 300px; overflow-y: auto; }
+
+/* ── Optimize button ──────────────────────────────────────── */
+#optimizeBtn { font-size: 13px; padding: 7px 14px; }
+
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 900px) {
   .layout { flex-direction: column; height: auto; }

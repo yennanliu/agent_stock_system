@@ -124,6 +124,85 @@ def _trade_log(stats: pd.Series) -> list[dict]:
     return log
 
 
+# ── Parameter optimisation ───────────────────────────────────────────────────
+
+def _build_param_grid(StrategyClass: type) -> dict[str, list]:
+    """Build a sensible search grid from a strategy class's numeric class attributes."""
+    grid: dict[str, list] = {}
+    for name, val in vars(StrategyClass).items():
+        if name.startswith("_"):
+            continue
+        if isinstance(val, int) and val > 0:
+            lo   = max(2, int(val * 0.5))
+            hi   = max(lo + 2, int(val * 1.5))
+            step = max(1, (hi - lo) // 4)
+            candidates = list(range(lo, hi + 1, step))
+            if val not in candidates:
+                candidates.append(val)
+            candidates = sorted(set(candidates))[:6]
+            if len(candidates) > 1:
+                grid[name] = candidates
+        elif isinstance(val, float) and 0 < val < 200:
+            factors = [0.5, 0.75, 1.0, 1.25, 1.5]
+            candidates = sorted({round(val * f, 4) for f in factors})
+            if len(candidates) > 1:
+                grid[name] = candidates
+    return grid
+
+
+def optimize_backtest(
+    source_code: str,
+    df: pd.DataFrame,
+    initial_cash: float = DEFAULT_CAPITAL,
+    maximize: str = "Sharpe Ratio",
+    max_tries: int = 100,
+) -> dict:
+    """
+    Grid-search strategy parameters and return the best configuration.
+
+    Returns:
+        {
+            "best_params": {name: value, ...},
+            "metrics": {...},           # metrics at best params
+            "maximize": str,
+            "tried": int,
+        }
+    or {} if the strategy has no tunable parameters or optimisation fails.
+    """
+    StrategyClass = _load_strategy_class(source_code)
+    grid = _build_param_grid(StrategyClass)
+    if not grid:
+        return {}
+
+    bt = Backtest(df, StrategyClass, cash=initial_cash, commission=0.002, exclusive_orders=True)
+    try:
+        opt_stats = bt.optimize(
+            **{k: v for k, v in grid.items()},
+            maximize=maximize,
+            max_tries=max_tries,
+            return_heatmap=False,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Optimisation failed: {e}") from e
+
+    # Extract which param values were used for the best run (convert numpy scalars)
+    best_params: dict = {}
+    for name in grid:
+        try:
+            val = getattr(opt_stats._strategy, name)
+            best_params[name] = int(val) if isinstance(val, (int, np.integer)) else float(val)
+        except AttributeError:
+            pass
+
+    return {
+        "best_params": best_params,
+        "metrics": _extract_metrics(opt_stats),
+        "maximize": maximize,
+        "tried": int(opt_stats.get("# Trades", 0)),  # proxy for tried count
+        "grid_size": sum(len(v) for v in grid.values()),
+    }
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def run_backtest(

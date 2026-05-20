@@ -16,6 +16,7 @@ from src.agents.strategy import (
 )
 from src.agents.python_master import python_master_agent, review_and_repair
 from src.agents.backtest import backtest_agent, build_backtest_task, generate_explanation
+from src.agents.critique import generate_critique
 from src.tools.fetch_data import fetch_ohlcv
 from src.tools.indicators import compute_indicators, market_summary
 from src.tools.backtest_runner import run_backtest
@@ -167,6 +168,99 @@ async def run_analyze_pipeline(
         f"Max DD: {m['max_drawdown_pct']}%",
         strategy_id=strategy_id,
         backtest_id=run_id,
+    )
+
+    # ── Stage 5: Self-Critique & Revised Strategy ─────────────────────────────
+    yield _sse("critique", "SelfCritiqueAgent analysing results and generating improvement…")
+    await asyncio.sleep(0)
+
+    try:
+        critique_result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: generate_critique(strategy_name, approved_code, m, narrative),
+        )
+    except Exception as e:
+        log.warning("Critique generation failed (non-fatal): %s", e)
+        yield _sse("critique", f"Critique skipped: {e}")
+        return
+
+    yield _sse(
+        "critique",
+        f"Critique complete. Running revised strategy: {critique_result.get('changes_summary', '')}",
+        critique=critique_result["critique"],
+        changes_summary=critique_result.get("changes_summary", ""),
+    )
+    await asyncio.sleep(0)
+
+    revised_code = critique_result.get("revised_code", "")
+    if not revised_code:
+        return
+
+    # Review the revised code
+    revised_review = await asyncio.get_event_loop().run_in_executor(
+        None, review_and_repair, revised_code
+    )
+    if not revised_review["approved"]:
+        yield _sse("critique", "Revised strategy failed code review — skipping.")
+        return
+
+    revised_approved = revised_review["source_code"]
+
+    # Backtest the revised strategy
+    try:
+        revised_bt = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: run_backtest(revised_approved, df, DEFAULT_CAPITAL)
+        )
+    except RuntimeError as e:
+        yield _sse("critique", f"Revised backtest failed: {e}")
+        return
+
+    revised_name     = extract_strategy_name(revised_approved) or f"{strategy_name}_Revised"
+    revised_params   = extract_parameters(revised_approved)
+    revised_narrative = await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: generate_explanation(revised_name, critique_result["critique"], revised_bt["metrics"]),
+    )
+
+    revised_sid = save_strategy(
+        ticker=ticker,
+        name=revised_name,
+        description=critique_result["critique"][:500],
+        source_code=revised_approved,
+        parameters=revised_params,
+    )
+    save_code_review(
+        strategy_id=revised_sid,
+        confidence=revised_review["confidence"],
+        issues_found=revised_review["issues_found"],
+        fixes_applied=revised_review["fixes_applied"],
+        iterations=revised_review["iterations"],
+        approved=revised_review["approved"],
+    )
+    revised_run_id = save_backtest_run(
+        strategy_id=revised_sid,
+        ticker=ticker,
+        start_date=revised_bt["start_date"],
+        end_date=revised_bt["end_date"],
+        initial_capital=DEFAULT_CAPITAL,
+        metrics=revised_bt["metrics"],
+        equity_curve=revised_bt["equity_curve"],
+        trade_log=revised_bt["trade_log"],
+        explanation=revised_narrative,
+        source_code=revised_approved,
+        raw_df=df,
+        price_series=revised_bt["price_series"],
+        signals=revised_bt["signals"],
+        walkforward=revised_bt.get("walkforward"),
+    )
+
+    rm = revised_bt["metrics"]
+    yield _sse(
+        "critique_complete",
+        f"Revised strategy done. Return: {rm['total_return_pct']}% | Sharpe: {rm['sharpe']}",
+        strategy_id=revised_sid,
+        backtest_id=revised_run_id,
+        original_backtest_id=run_id,
     )
 
 

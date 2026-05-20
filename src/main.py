@@ -20,6 +20,7 @@ from src.tools.db import (
     list_strategies,
     list_runs_for_ticker,
 )
+from src.tools.job_queue import create_job, job_status, stream_job, start_pipeline_job
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -44,19 +45,37 @@ async def analyze(
     indicators: str = Query("auto", description="Indicators to use: sma, ema, rsi, macd, bollinger, atr, combined, auto"),
     period: str = Query(DATA_PERIOD, description="Data period: 1y, 2y, 5y, 10y"),
 ):
-    """Full pipeline: data → strategy → review → backtest, streamed via SSE."""
+    """Full pipeline streamed via SSE, backed by the background job queue."""
     from src.crew import run_analyze_pipeline
 
-    async def stream():
-        async for event in run_analyze_pipeline(
+    job_id = create_job(ticker.upper())
+
+    def _factory():
+        return run_analyze_pipeline(
             ticker.upper(),
             strategy_type=strategy_type,
             indicators=indicators,
             period=period,
-        ):
-            yield event
+        )
 
-    return EventSourceResponse(stream())
+    start_pipeline_job(job_id, _factory)
+    return EventSourceResponse(stream_job(job_id))
+
+
+@app.get("/api/jobs/{job_id}/status")
+async def get_job_status(job_id: str):
+    status = job_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return status
+
+
+@app.get("/api/jobs/{job_id}/stream")
+async def reconnect_job_stream(job_id: str):
+    """Reconnect to a running or completed job's SSE stream."""
+    if job_status(job_id) is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return EventSourceResponse(stream_job(job_id))
 
 
 @app.get("/api/run/{strategy_id}")
@@ -68,11 +87,9 @@ async def rerun(strategy_id: int, period: str = Query(DATA_PERIOD)):
     if strategy is None:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
-    async def stream():
-        async for event in run_backtest_pipeline(strategy, period):
-            yield event
-
-    return EventSourceResponse(stream())
+    job_id = create_job(strategy["ticker"])
+    start_pipeline_job(job_id, lambda: run_backtest_pipeline(strategy, period))
+    return EventSourceResponse(stream_job(job_id))
 
 
 # ── REST read endpoints ───────────────────────────────────────────────────────
@@ -118,6 +135,30 @@ async def run_source(run_id: int):
         media_type="text/x-python",
         headers={"Content-Disposition": f'attachment; filename="run_{run_id}_{ticker}.py"'},
     )
+
+
+@app.get("/api/backtest/{run_id}/ohlcv")
+async def run_ohlcv(run_id: int):
+    """Return OHLCV data for this run as JSON (for candlestick chart)."""
+    path = get_run_raw_data_path(run_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Raw data not available for this run")
+    try:
+        import pandas as pd
+        df = pd.read_csv(path, index_col=0, parse_dates=True)
+        out = []
+        for idx, row in df.iterrows():
+            out.append({
+                "time":   str(idx.date()),
+                "open":   round(float(row["Open"]),  4),
+                "high":   round(float(row["High"]),  4),
+                "low":    round(float(row["Low"]),   4),
+                "close":  round(float(row["Close"]), 4),
+                "volume": int(row["Volume"]) if "Volume" in row else 0,
+            })
+        return out
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/backtest/{run_id}/rawdata")
@@ -189,6 +230,64 @@ async def all_runs():
             d["metrics"] = json.loads(d["metrics"])
         result.append(d)
     return result
+
+
+@app.get("/api/strategies/{strategy_id}/optimize")
+async def optimize_strategy(
+    strategy_id: int,
+    period: str = Query(DATA_PERIOD),
+    maximize: str = Query("Sharpe Ratio", description="Metric to maximize"),
+):
+    """Grid-search strategy parameters via SSE. Streams progress then returns best params."""
+    from src.tools.fetch_data import fetch_ohlcv
+    from src.tools.indicators import compute_indicators
+    from src.tools.backtest_runner import optimize_backtest
+
+    strategy = get_strategy(strategy_id)
+    if strategy is None:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    async def stream():
+        def _sse(stage, msg, **kw):
+            return {"data": json.dumps({"stage": stage, "message": msg, **kw})}
+
+        yield _sse("optimize", f"Fetching data for {strategy['ticker']} ({period})…")
+        await asyncio.sleep(0)
+        try:
+            df = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: compute_indicators(fetch_ohlcv(strategy["ticker"], period)),
+            )
+        except Exception as e:
+            yield _sse("error", f"Data fetch failed: {e}")
+            return
+
+        yield _sse("optimize", f"Running parameter grid search (maximize: {maximize})…")
+        await asyncio.sleep(0)
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: optimize_backtest(strategy["source_code"], df, maximize=maximize),
+            )
+        except RuntimeError as e:
+            yield _sse("error", str(e))
+            return
+
+        if not result:
+            yield _sse("optimize_done", "No tunable parameters found in this strategy.", best_params={}, metrics={})
+            return
+
+        bp = result["best_params"]
+        m  = result["metrics"]
+        yield _sse(
+            "optimize_done",
+            f"Best params found. Sharpe: {m.get('sharpe', '—')} | Return: {m.get('total_return_pct', '—')}%",
+            best_params=bp,
+            metrics=m,
+            strategy_id=strategy_id,
+        )
+
+    return EventSourceResponse(stream())
 
 
 @app.get("/api/strategies/{strategy_id}/run-with-params")

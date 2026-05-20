@@ -93,6 +93,7 @@
         <span>Strategy Source Code</span>
         <div class="code-actions">
           <a id="downloadBtn" class="icon-link" title="Download .py file">⬇ Download .py</a>
+          <button id="optimizeBtn" class="icon-btn" title="Grid-search best parameters">⚡ Optimize</button>
           <button id="runBtn" class="run-btn">▶ Run Again</button>
         </div>
       </div>
@@ -110,22 +111,26 @@
         </div>
       </div>
       <div id="metricsRow" class="metrics-row"></div>
+      <div id="optimizeCard" class="walkforward-card" hidden>
+        <h4>Parameter Optimisation Results <span id="optimizeBadge" class="wf-badge"></span></h4>
+        <div id="optimizeTable"></div>
+        <button id="applyOptimizedBtn" class="run-btn" style="margin-top:12px" hidden>▶ Run with Optimised Params</button>
+      </div>
       <div id="walkforwardCard" class="walkforward-card" hidden>
         <h4>Walk-Forward Validation <span class="wf-badge">In-sample 70% / Out-of-sample 30%</span></h4>
         <div id="walkforwardTable"></div>
       </div>
 
-      <!-- Price chart with animated buy/sell signals -->
+      <!-- Candlestick chart with buy/sell markers -->
       <div class="chart-card full-width" id="signalChartCard" hidden>
         <div class="signal-chart-header">
-          <h4>Price Action &amp; Trade Signals</h4>
+          <h4>Candlestick Chart &amp; Trade Signals</h4>
           <div class="signal-legend">
             <span class="legend-dot buy"></span>Buy
             <span class="legend-dot sell"></span>Sell
           </div>
-          <button id="replayBtn" class="replay-btn" title="Replay animation">⟳ Replay</button>
         </div>
-        <canvas id="signalChart"></canvas>
+        <div id="candleChart" style="height:320px;width:100%;"></div>
       </div>
 
       <div class="charts-grid">
@@ -167,6 +172,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -4,9 +4,10 @@
 let currentStrategyId = null;
 let currentBacktestId = null;
 let activeHistoryId   = null;
-let equityChart = null, drawdownChart = null, pnlChart = null, signalChart = null;
-let _signalAnimData = null;  // cached for replay
+let equityChart = null, drawdownChart = null, pnlChart = null;
+let _candleChart = null;    // lightweight-charts instance
 let _originalParams = {};   // original params for reset
+let _optimizedParams = {};  // best params from optimize run
 
 // ── DOM ───────────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -23,12 +24,13 @@ const downloadBtn        = $('downloadBtn');
 const runIdBadge         = $('runIdBadge');
 const runSourceBtn       = $('runSourceBtn');
 const runDataBtn         = $('runDataBtn');
-const replayBtn          = $('replayBtn');
 const historyList        = $('historyList');
 const refreshHistBtn     = $('refreshHistoryBtn');
 const runWithParamsBtn   = $('runWithParamsBtn');
 const resetParamsBtn     = $('resetParamsBtn');
 const paramActions       = $('paramActions');
+const optimizeBtn        = $('optimizeBtn');
+const applyOptimizedBtn  = $('applyOptimizedBtn');
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 refreshHistoryList();
@@ -41,9 +43,10 @@ analyzeBtn.addEventListener('click', () => {
 tickerInput.addEventListener('keydown', e => { if (e.key === 'Enter') analyzeBtn.click(); });
 runBtn.addEventListener('click', () => rerunStrategy());
 refreshHistBtn.addEventListener('click', refreshHistoryList);
-replayBtn.addEventListener('click', () => { if (_signalAnimData) animateSignalChart(_signalAnimData); });
 runWithParamsBtn.addEventListener('click', () => rerunWithParams());
 resetParamsBtn.addEventListener('click', () => resetParams());
+optimizeBtn.addEventListener('click', () => runOptimize());
+applyOptimizedBtn.addEventListener('click', () => applyOptimized());
 
 // ── Analysis pipeline ─────────────────────────────────────────────────────────
 function startAnalysis(ticker) {
@@ -60,15 +63,26 @@ function startAnalysis(ticker) {
   );
   es.onmessage = async e => {
     const data = JSON.parse(e.data);
+    if (data.stage === 'ping') return;
     appendLog(data.stage, data.message, data.stage === 'error');
 
     if (data.stage === 'complete') {
+      await loadStrategy(data.strategy_id);
+      await loadBacktest(data.backtest_id);
+      setActiveHistory(data.backtest_id);
+      refreshHistoryList();
+    }
+    if (data.stage === 'critique' && data.critique) {
+      renderCritiquePreview(data.critique, data.changes_summary);
+    }
+    if (data.stage === 'critique_complete') {
       es.close();
       analyzeBtn.disabled = false;
       await loadStrategy(data.strategy_id);
       await loadBacktest(data.backtest_id);
       setActiveHistory(data.backtest_id);
       refreshHistoryList();
+      appendLog('critique_complete', `Revised strategy loaded. Compare with original run #${data.original_backtest_id}.`);
     }
     if (data.stage === 'error') { es.close(); analyzeBtn.disabled = false; }
   };
@@ -257,11 +271,9 @@ async function loadBacktest(id) {
   runDataBtn.download = `run_${id}_${ticker}_raw.csv`;
   runDataBtn.hidden = !data.raw_data_path;
 
-  // Signal animation chart
-  if (data.price_series && data.price_series.length) {
-    $('signalChartCard').hidden = false;
-    _signalAnimData = { prices: data.price_series, signals: data.signals || [], ticker };
-    animateSignalChart(_signalAnimData);
+  // Candlestick chart (uses saved raw OHLCV CSV via /api/backtest/{id}/ohlcv)
+  if (data.raw_data_path) {
+    await renderCandleChart(id, data.signals || []);
   } else {
     $('signalChartCard').hidden = true;
   }
@@ -269,108 +281,127 @@ async function loadBacktest(id) {
   backtestPanel.hidden = false;
 }
 
-// ── Signal animation chart ────────────────────────────────────────────────────
-function animateSignalChart({ prices, signals, ticker }) {
-  if (signalChart) signalChart.destroy();
+// ── Candlestick chart (lightweight-charts) ────────────────────────────────────
+async function renderCandleChart(runId, signals) {
+  const container = $('candleChart');
+  if (_candleChart) { _candleChart.remove(); _candleChart = null; }
 
-  // Build a date→close lookup for signal marker positioning
-  const priceMap = {};
-  prices.forEach(p => { priceMap[p.date] = p.close; });
+  let ohlcv = [];
+  try {
+    ohlcv = await fetch(`/api/backtest/${runId}/ohlcv`).then(r => r.json());
+  } catch (_) { $('signalChartCard').hidden = true; return; }
+  if (!ohlcv.length) { $('signalChartCard').hidden = true; return; }
 
-  // Scatter datasets for buy / sell signals (empty at start — filled during animation)
-  const buyPoints  = [];
-  const sellPoints = [];
-  const buyDates   = new Set(signals.filter(s => s.type === 'buy').map(s => s.date));
-  const sellDates  = new Set(signals.filter(s => s.type === 'sell').map(s => s.date));
+  $('signalChartCard').hidden = false;
+  container.innerHTML = '';
 
-  const allDates  = prices.map(p => p.date);
-  const allPrices = prices.map(p => p.close);
-
-  signalChart = new Chart($('signalChart'), {
-    type: 'line',
-    data: {
-      labels: allDates,
-      datasets: [
-        {
-          label: `${ticker} Close`,
-          data: [],           // filled progressively
-          borderColor: '#6c8eff',
-          borderWidth: 1.8,
-          pointRadius: 0,
-          fill: false,
-          tension: 0.2,
-          order: 3,
-        },
-        {
-          label: 'Buy',
-          data: [],
-          type: 'scatter',
-          pointStyle: 'triangle',
-          pointRadius: 8,
-          pointHoverRadius: 10,
-          backgroundColor: 'rgba(52,211,153,0.9)',
-          borderColor: '#34d399',
-          borderWidth: 1,
-          order: 1,
-          showLine: false,
-        },
-        {
-          label: 'Sell',
-          data: [],
-          type: 'scatter',
-          pointStyle: 'rectRot',
-          pointRadius: 8,
-          pointHoverRadius: 10,
-          backgroundColor: 'rgba(248,113,113,0.9)',
-          borderColor: '#f87171',
-          borderWidth: 1,
-          order: 2,
-          showLine: false,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      animation: false,   // we handle animation manually
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: '#8892a4', font: { size: 11 } } },
-        tooltip: {
-          backgroundColor: '#1a1d27', borderColor: '#2d3148', borderWidth: 1,
-          titleColor: '#e2e8f0', bodyColor: '#8892a4',
-        },
-      },
-      scales: {
-        x: { ticks: { color: '#8892a4', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: '#1e2235' } },
-        y: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: '#1e2235' },
-             title: { display: true, text: 'Price ($)', color: '#8892a4', font: { size: 11 } } },
-      },
-    },
+  const chart = LightweightCharts.createChart(container, {
+    width:  container.clientWidth,
+    height: 320,
+    layout: { background: { color: '#13161f' }, textColor: '#8892a4' },
+    grid:   { vertLines: { color: '#1e2235' }, horzLines: { color: '#1e2235' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#2a2f4a' },
+    timeScale: { borderColor: '#2a2f4a', timeVisible: true },
   });
+  _candleChart = chart;
 
-  // Animate: reveal one bar per frame, reveal signals when their date arrives
-  let frame = 0;
-  const totalFrames = allDates.length;
-  const msPerFrame  = Math.max(4, Math.min(16, 4000 / totalFrames)); // target ~4s total
+  const candleSeries = chart.addCandlestickSeries({
+    upColor:   '#3de8a0', downColor: '#ff6b6b',
+    borderUpColor: '#3de8a0', borderDownColor: '#ff6b6b',
+    wickUpColor:   '#3de8a0', wickDownColor:   '#ff6b6b',
+  });
+  candleSeries.setData(ohlcv);
 
-  function tick() {
-    if (frame >= totalFrames) return;
-
-    const date  = allDates[frame];
-    const price = allPrices[frame];
-
-    signalChart.data.datasets[0].data.push(price);
-
-    if (buyDates.has(date))  signalChart.data.datasets[1].data.push({ x: date, y: priceMap[date] * 0.985 });
-    if (sellDates.has(date)) signalChart.data.datasets[2].data.push({ x: date, y: priceMap[date] * 1.015 });
-
-    signalChart.update('none');
-    frame++;
-    setTimeout(tick, msPerFrame);
+  // Buy/sell markers
+  if (signals && signals.length) {
+    const markers = signals.map(s => ({
+      time:     s.date,
+      position: s.type === 'buy' ? 'belowBar' : 'aboveBar',
+      color:    s.type === 'buy' ? '#3de8a0'  : '#ff6b6b',
+      shape:    s.type === 'buy' ? 'arrowUp'  : 'arrowDown',
+      text:     s.type === 'buy' ? 'B'        : 'S',
+    })).sort((a, b) => a.time < b.time ? -1 : 1);
+    candleSeries.setMarkers(markers);
   }
 
-  tick();
+  chart.timeScale().fitContent();
+
+  // Resize on window resize
+  window.addEventListener('resize', () => {
+    if (_candleChart) chart.resize(container.clientWidth, 320);
+  }, { once: true });
+}
+
+// ── Optimize ──────────────────────────────────────────────────────────────────
+function runOptimize() {
+  if (!currentStrategyId) return;
+  optimizeBtn.disabled = true;
+  const period = periodSelect.value;
+
+  const es = new EventSource(`/api/strategies/${currentStrategyId}/optimize?period=${period}`);
+  es.onmessage = e => {
+    const data = JSON.parse(e.data);
+    appendLog(data.stage || 'optimize', data.message, data.stage === 'error');
+    if (data.stage === 'optimize_done') {
+      es.close(); optimizeBtn.disabled = false;
+      renderOptimizeResults(data.best_params, data.metrics);
+    }
+    if (data.stage === 'error') { es.close(); optimizeBtn.disabled = false; }
+  };
+  es.onerror = () => { es.close(); optimizeBtn.disabled = false; };
+}
+
+function renderOptimizeResults(bestParams, metrics) {
+  const card = $('optimizeCard');
+  if (!bestParams || !Object.keys(bestParams).length) {
+    card.hidden = true; return;
+  }
+  _optimizedParams = bestParams;
+  card.hidden = false;
+  $('optimizeBadge').textContent = `Maximize: Sharpe Ratio`;
+
+  $('optimizeTable').innerHTML = `
+    <table class="wf-table">
+      <thead><tr><th>Parameter</th><th>Original</th><th>Optimised</th></tr></thead>
+      <tbody>
+        ${Object.entries(bestParams).map(([k, v]) => {
+          const orig = _originalParams[k];
+          const changed = orig !== undefined && orig !== v;
+          return `<tr>
+            <td>${escHtml(k)}</td>
+            <td>${orig !== undefined ? orig : '—'}</td>
+            <td class="${changed ? 'td-pos' : ''}">${v}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    ${metrics ? `<div class="wf-split-note">Optimised Sharpe: ${fmt(metrics.sharpe)} · Return: ${fmt(metrics.total_return_pct)}%</div>` : ''}`;
+
+  applyOptimizedBtn.hidden = false;
+}
+
+function applyOptimized() {
+  // Fill optimized values into the editable param inputs, then trigger re-run
+  Object.entries(_optimizedParams).forEach(([k, v]) => {
+    const input = document.querySelector(`.param-input[data-param="${k}"]`);
+    if (input) input.value = v;
+  });
+  rerunWithParams();
+}
+
+// ── Critique preview ──────────────────────────────────────────────────────────
+function renderCritiquePreview(critique, changesSummary) {
+  let el = $('critiquePreview');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'critiquePreview';
+    el.className = 'walkforward-card';
+    $('backtest-panel').appendChild(el);
+  }
+  el.hidden = false;
+  el.innerHTML = `<h4>Self-Critique <span class="wf-badge">${escHtml(changesSummary || '')}</span></h4>
+    <div class="narrative" style="font-size:13px">${marked.parse(critique)}</div>`;
 }
 
 // ── Metrics ───────────────────────────────────────────────────────────────────
